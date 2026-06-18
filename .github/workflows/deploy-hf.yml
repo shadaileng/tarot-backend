@@ -6,7 +6,7 @@ on:
     paths:
       - 'src/**'
       - 'assets/**'
-      - 'scripts/entrypoint.sh'
+      - 'scripts/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'tsconfig.json'
