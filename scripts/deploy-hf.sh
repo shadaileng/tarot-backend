@@ -199,19 +199,19 @@ else
   exit 1
 fi
 
-# ---------- 4. 设置 GEMINI_API_KEY 环境变量 ----------
-log_info "设置 GEMINI_API_KEY 环境变量..."
-ENV_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-  "https://huggingface.co/api/spaces/${HF_USERNAME}/${HF_SPACE_NAME}/env" \
+# ---------- 4. 设置 GEMINI_API_KEY Secret ----------
+log_info "设置 GEMINI_API_KEY Secret..."
+SECRET_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+  "https://huggingface.co/api/spaces/${HF_USERNAME}/${HF_SPACE_NAME}/secrets" \
   -H "Authorization: Bearer ${HF_TOKEN}" \
   -H "Content-Type: application/json" \
   -d "{\"key\": \"GEMINI_API_KEY\", \"value\": \"${GEMINI_API_KEY}\"}")
 
-if [ "$ENV_RESPONSE" = "200" ]; then
-  log_ok "  ✓ GEMINI_API_KEY 环境变量已设置"
+if [ "$SECRET_RESPONSE" = "200" ]; then
+  log_ok "  ✓ GEMINI_API_KEY Secret 已设置"
 else
-  log_warn "  ⚠ GEMINI_API_KEY 环境变量设置失败 (HTTP $ENV_RESPONSE)"
-  log_warn "  请手动在 HF Space Settings → Variables and secrets → Variables 中添加"
+  log_warn "  ⚠ GEMINI_API_KEY Secret 设置失败 (HTTP $SECRET_RESPONSE)"
+  log_warn "  请手动在 HF Space Settings → Variables and secrets → Secrets 中添加"
 fi
 
 log_ok "✅ 部署完成！"
