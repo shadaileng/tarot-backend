@@ -1,7 +1,7 @@
 # ========== 构建阶段 ==========
 FROM node:22-slim AS builder
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable
 
 WORKDIR /app
 COPY pnpm-lock.yaml package.json ./
@@ -14,7 +14,7 @@ COPY assets/ ./assets/
 # ========== 运行阶段 ==========
 FROM node:22-slim
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable
 
 RUN apt-get update && apt-get install -y \
   chromium \
