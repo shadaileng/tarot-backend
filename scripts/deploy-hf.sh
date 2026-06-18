@@ -201,7 +201,7 @@ fi
 
 # ---------- 4. 设置 GEMINI_API_KEY Secret ----------
 log_info "设置 GEMINI_API_KEY Secret..."
-SECRET_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+SECRET_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -L -X POST \
   "https://huggingface.co/api/spaces/${HF_USERNAME}/${HF_SPACE_NAME}/secrets" \
   -H "Authorization: Bearer ${HF_TOKEN}" \
   -H "Content-Type: application/json" \
@@ -216,7 +216,7 @@ fi
 
 # ---------- 5. 验证 GEMINI_API_KEY Secret 是否存在 ----------
 log_info "验证 GEMINI_API_KEY Secret..."
-VERIFY_RESPONSE=$(curl -s \
+VERIFY_RESPONSE=$(curl -s -L \
   "https://huggingface.co/api/spaces/${HF_USERNAME}/${HF_SPACE_NAME}/secrets" \
   -H "Authorization: Bearer ${HF_TOKEN}")
 
