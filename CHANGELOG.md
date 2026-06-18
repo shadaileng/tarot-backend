@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- 修复日志中间件事件竞态条件：`req.on('close')` 在微信小程序环境下先于 `res.on('finish')` 触发，导致所有 reading 日志均记录为 499 + null。现在 `req.on('close')` 会检查响应体是否已捕获，已捕获则使用实际响应数据记录日志
+- 重构日志中间件：移除 `res.on('finish')` 和 `req.on('close')` 事件监听器，改为在 `res.json()` / `res.send()` 中直接记录日志，彻底解决事件竞态导致 reading/model 为 null 的问题
 
 ## [1.1.2] - 2026-06-18
 

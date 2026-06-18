@@ -16,36 +16,17 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
   const start = Date.now()
   const logId = crypto.randomUUID()
   const requestBody = req.body || {}
+  const target = req.path === '/reading' ? 'reading' : req.path === '/poster' ? 'poster' : 'other'
 
-  const originalSend = res.send.bind(res)
-  const originalJson = res.json.bind(res)
-  let responseBody: any = null
+  let logWritten = false
 
-  res.json = function (body: any) {
-    responseBody = body
-    return originalJson(body)
-  }
-
-  res.send = function (body: any) {
-    if (responseBody === null) {
-      responseBody = body
-    }
-    return originalSend(body)
-  }
-
-  let responseLogged = false
-
-  res.on('finish', () => {
-    if (responseLogged) return
-    responseLogged = true
+  function writeLog(body: any): void {
+    if (logWritten || target === 'other') return
+    logWritten = true
     const duration = Date.now() - start
-    const target = req.path === '/reading' ? 'reading' : req.path === '/poster' ? 'poster' : 'other'
-
-    if (target === 'other') return
-
     const isError = res.statusCode >= 400
-    const respObj = responseBody && typeof responseBody === 'object' && !Buffer.isBuffer(responseBody)
-      ? responseBody as Record<string, any>
+    const respObj = body && typeof body === 'object' && !Buffer.isBuffer(body)
+      ? body as Record<string, any>
       : null
 
     const errorMsg = isError && respObj
@@ -68,63 +49,24 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
       is_error: isError,
       error_msg: errorMsg,
     }).catch((err) => {
-      log.error({ err, logId }, 'Failed to insert log on finish')
+      log.error({ err, logId }, 'Failed to insert log')
     })
-  })
+  }
 
-  req.on('close', () => {
-    if (responseLogged) return
-    responseLogged = true
-    const duration = Date.now() - start
-    const target = req.path === '/reading' ? 'reading' : req.path === '/poster' ? 'poster' : 'other'
-    if (target === 'other') return
+  const originalJson = res.json.bind(res)
+  const originalSend = res.send.bind(res)
 
-    const respObj = responseBody && typeof responseBody === 'object' && !Buffer.isBuffer(responseBody)
-      ? responseBody as Record<string, any>
-      : null
+  res.json = function (body: any) {
+    writeLog(body)
+    return originalJson(body)
+  }
 
-    if (respObj) {
-      const isError = res.statusCode >= 400
-      const errorMsg = isError ? (respObj.error || respObj.detail || null) : null
-      insertLog({
-        id: logId,
-        method: req.method,
-        path: req.path,
-        target,
-        status_code: res.statusCode,
-        duration_ms: duration,
-        ip_address: req.ip || req.socket.remoteAddress || '',
-        question: requestBody.question || null,
-        cards_json: requestBody.cards ? JSON.stringify(requestBody.cards) : null,
-        reading: target === 'reading' ? (respObj.reading || null) : null,
-        model: target === 'reading' ? (respObj.model || null) : null,
-        incomplete: target === 'reading' ? !!(respObj.incomplete) : false,
-        is_error: isError,
-        error_msg: errorMsg,
-      }).catch((err) => {
-        log.error({ err, logId }, 'Failed to insert log on close (with response)')
-      })
-    } else {
-      insertLog({
-        id: logId,
-        method: req.method,
-        path: req.path,
-        target,
-        status_code: 499,
-        duration_ms: duration,
-        ip_address: req.ip || req.socket.remoteAddress || '',
-        question: requestBody.question || null,
-        cards_json: requestBody.cards ? JSON.stringify(requestBody.cards) : null,
-        reading: null,
-        model: null,
-        incomplete: false,
-        is_error: true,
-        error_msg: 'Client disconnected before response completed',
-      }).catch((err) => {
-        log.error({ err, logId }, 'Failed to insert log on close')
-      })
+  res.send = function (body: any) {
+    if (!logWritten) {
+      writeLog(body)
     }
-  })
+    return originalSend(body)
+  }
 
   next()
 }
