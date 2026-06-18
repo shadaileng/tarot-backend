@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2026-06-18
+
+### Fixed
+
+- 修复日志中间件事件竞态条件：`req.on('close')` 在微信小程序环境下先于 `res.on('finish')` 触发，导致所有 reading 日志均记录为 499 + null。现在 `req.on('close')` 会检查响应体是否已捕获，已捕获则使用实际响应数据记录日志
+
 ## [1.1.2] - 2026-06-18
 
 ### Fixed

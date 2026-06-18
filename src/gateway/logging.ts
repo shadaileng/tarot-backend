@@ -78,24 +78,52 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
     const duration = Date.now() - start
     const target = req.path === '/reading' ? 'reading' : req.path === '/poster' ? 'poster' : 'other'
     if (target === 'other') return
-    insertLog({
-      id: logId,
-      method: req.method,
-      path: req.path,
-      target,
-      status_code: 499,
-      duration_ms: duration,
-      ip_address: req.ip || req.socket.remoteAddress || '',
-      question: requestBody.question || null,
-      cards_json: requestBody.cards ? JSON.stringify(requestBody.cards) : null,
-      reading: null,
-      model: null,
-      incomplete: false,
-      is_error: true,
-      error_msg: 'Client disconnected before response completed',
-    }).catch((err) => {
-      log.error({ err, logId }, 'Failed to insert log on close')
-    })
+
+    const respObj = responseBody && typeof responseBody === 'object' && !Buffer.isBuffer(responseBody)
+      ? responseBody as Record<string, any>
+      : null
+
+    if (respObj) {
+      const isError = res.statusCode >= 400
+      const errorMsg = isError ? (respObj.error || respObj.detail || null) : null
+      insertLog({
+        id: logId,
+        method: req.method,
+        path: req.path,
+        target,
+        status_code: res.statusCode,
+        duration_ms: duration,
+        ip_address: req.ip || req.socket.remoteAddress || '',
+        question: requestBody.question || null,
+        cards_json: requestBody.cards ? JSON.stringify(requestBody.cards) : null,
+        reading: target === 'reading' ? (respObj.reading || null) : null,
+        model: target === 'reading' ? (respObj.model || null) : null,
+        incomplete: target === 'reading' ? !!(respObj.incomplete) : false,
+        is_error: isError,
+        error_msg: errorMsg,
+      }).catch((err) => {
+        log.error({ err, logId }, 'Failed to insert log on close (with response)')
+      })
+    } else {
+      insertLog({
+        id: logId,
+        method: req.method,
+        path: req.path,
+        target,
+        status_code: 499,
+        duration_ms: duration,
+        ip_address: req.ip || req.socket.remoteAddress || '',
+        question: requestBody.question || null,
+        cards_json: requestBody.cards ? JSON.stringify(requestBody.cards) : null,
+        reading: null,
+        model: null,
+        incomplete: false,
+        is_error: true,
+        error_msg: 'Client disconnected before response completed',
+      }).catch((err) => {
+        log.error({ err, logId }, 'Failed to insert log on close')
+      })
+    }
   })
 
   next()
