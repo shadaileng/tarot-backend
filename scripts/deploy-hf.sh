@@ -214,4 +214,17 @@ else
   log_warn "  请手动在 HF Space Settings → Variables and secrets → Secrets 中添加"
 fi
 
+# ---------- 5. 验证 GEMINI_API_KEY Secret 是否存在 ----------
+log_info "验证 GEMINI_API_KEY Secret..."
+VERIFY_RESPONSE=$(curl -s \
+  "https://huggingface.co/api/spaces/${HF_USERNAME}/${HF_SPACE_NAME}/secrets" \
+  -H "Authorization: Bearer ${HF_TOKEN}")
+
+if echo "$VERIFY_RESPONSE" | grep -q "GEMINI_API_KEY"; then
+  log_ok "  ✓ GEMINI_API_KEY Secret 验证成功"
+else
+  log_error "  ✗ GEMINI_API_KEY Secret 未找到，请手动检查"
+  log_error "  API 响应: $VERIFY_RESPONSE"
+fi
+
 log_ok "✅ 部署完成！"
