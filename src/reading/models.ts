@@ -146,6 +146,7 @@ export interface ReadingResult {
   error?: string
   detail?: string
   exhaustedModels?: string[]
+  lastGeminiStatus?: number
 }
 
 export async function callGeminiReading(apiKey: string, question: string, cards: any[]): Promise<ReadingResult> {
@@ -249,6 +250,7 @@ export async function callGeminiReading(apiKey: string, question: string, cards:
     detail: lastErrorText.slice(0, 500),
     model: lastUsedModel,
     exhaustedModels: [...quotaExhaustedCache.models],
+    lastGeminiStatus: lastErrorStatus,
   }
 }
 

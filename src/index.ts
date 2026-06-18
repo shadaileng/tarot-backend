@@ -1,7 +1,7 @@
 import 'dotenv/config'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import express from 'express'
+import express, { type Request, type Response, type NextFunction } from 'express'
 import { config } from './config.js'
 import { corsMiddleware } from './middleware/cors.js'
 import { authMiddleware } from './middleware/auth.js'
@@ -156,6 +156,11 @@ app.get('/logs/:id', async (req, res) => {
     return
   }
   res.json(log)
+})
+
+app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  log.error({ err }, 'Unhandled error')
+  res.status(500).json({ error: 'Internal server error' })
 })
 
 async function start(): Promise<void> {

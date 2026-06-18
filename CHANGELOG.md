@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-06-18
+
+### Fixed
+
+- 修复 `insertLog` 未调用 `saveDb()` 导致日志写入仅存内存、重启丢失的问题
+- 替换日志中间件中 `.catch(() => {})` 为 pino 结构化错误日志，避免静默吞掉异常
+- 添加 Express 全局错误处理中间件，兜底未捕获异常
+- 修复所有模型失败时错误响应体缺少 `status` 字段的问题（与 reading-api 对齐）
+
 ## [1.0.0] - 2026-06-18
 
 ### Added

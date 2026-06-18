@@ -14,7 +14,7 @@ async function initSql(): Promise<SqlJsStatic> {
   return SQL
 }
 
-function saveDb(): void {
+export function saveDb(): void {
   const data = db!.export()
   const dir = path.dirname(config.db.path)
   if (!fs.existsSync(dir)) {

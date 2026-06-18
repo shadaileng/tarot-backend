@@ -1,6 +1,9 @@
 import type { Request, Response, NextFunction } from 'express'
 import crypto from 'crypto'
 import { insertLog } from '../db/reading-log.js'
+import { getLogger } from '../logger.js'
+
+const log = getLogger('gateway')
 
 const SKIP_PATHS = ['/', '/health', '/metrics', '/logs']
 
@@ -64,7 +67,9 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
       incomplete: target === 'reading' && respObj ? !!(respObj.incomplete) : false,
       is_error: isError,
       error_msg: errorMsg,
-    }).catch(() => {})
+    }).catch((err) => {
+      log.error({ err, logId }, 'Failed to insert log on finish')
+    })
   })
 
   req.on('close', () => {
@@ -88,7 +93,9 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
       incomplete: false,
       is_error: true,
       error_msg: 'Client disconnected before response completed',
-    }).catch(() => {})
+    }).catch((err) => {
+      log.error({ err, logId }, 'Failed to insert log on close')
+    })
   })
 
   next()

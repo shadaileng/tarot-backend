@@ -34,6 +34,7 @@ export async function readingHandler(req: Request, res: Response): Promise<void>
       res.status(result.status).json({
         error: result.error,
         detail: result.detail,
+        status: result.lastGeminiStatus,
         model: result.model,
         exhaustedModels: result.exhaustedModels,
       })

@@ -1,4 +1,4 @@
-import { getDb, closeDb } from './index.js'
+import { getDb, closeDb, saveDb } from './index.js'
 
 export interface LogEntry {
   id: string
@@ -66,6 +66,7 @@ export async function insertLog(params: InsertLogParams): Promise<void> {
       params.error_msg ?? null,
     ],
   )
+  saveDb()
 }
 
 export async function queryLogs(page: number = 1, limit: number = 50, target?: string): Promise<LogQueryResult> {
