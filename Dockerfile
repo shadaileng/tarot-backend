@@ -1,5 +1,5 @@
 # ========== 构建阶段 ==========
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
@@ -12,7 +12,7 @@ RUN pnpm run build
 COPY assets/ ./assets/
 
 # ========== 运行阶段 ==========
-FROM node:20-slim
+FROM node:22-slim
 
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
