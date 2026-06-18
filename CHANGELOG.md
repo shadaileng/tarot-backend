@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-06-18
+
+### Fixed
+
+- `pnpm-workspace.yaml` 使用 `onlyBuiltDependencies` 替代占位符 `allowBuilds`，放行 `esbuild` 和 `puppeteer` 的 build scripts，修复 Docker 构建中 `ERR_PNPM_IGNORED_BUILDS` 错误
+
 ## [1.1.1] - 2026-06-18
 
 ### Fixed
