@@ -1,0 +1,43 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+
+# 数据库文件
+data/
+*.db
+
+# 环境变量（含敏感信息）
+.env
+.env.local
+.env.*.local
+
+# 日志
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# 测试产物
+coverage/
+
+# 临时文件
+*.tmp
+*.temp
+
+# Docker 相关
+docker-compose.yml

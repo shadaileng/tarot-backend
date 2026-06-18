@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1080, initial-scale=1">
+<style>
+{{ themeCSSVars }}
+{{ css }}
+</style>
+</head>
+<body>
+  <div class="poster-container poster-ready">
+    <!-- 顶部装饰 -->
+    <div class="header-decor">
+      <div class="moon">☽ ★ ☾</div>
+      <div class="line"></div>
+    </div>
+
+    <!-- 标题 -->
+    <div class="poster-title">塔 罗 占 卜</div>
+    <div class="poster-subtitle">{{ spreadName }}</div>
+
+    <!-- 问题 -->
+    <div class="question-section">
+      <div class="question-text">{{ question }}</div>
+    </div>
+
+    <!-- 牌阵 -->
+    <div class="cards-section">
+      <div class="cards-grid">
+        {{{ cardsHTML }}}
+      </div>
+    </div>
+
+    <!-- AI 解读 -->
+    {{{ interpretationHTML }}}
+
+    <!-- 底部 -->
+    <div class="footer">
+      <div class="footer-text">AI塔罗占卜 · {{ date }}</div>
+    </div>
+  </div>
+</body>
+</html>

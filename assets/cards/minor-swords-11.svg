@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 660" width="400" height="660">
+  <defs>
+    <linearGradient id="bg-minor-swords-11" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2c3e50"/>
+      <stop offset="100%" style="stop-color:#1a252f"/>
+    </linearGradient>
+    <linearGradient id="border-minor-swords-11" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a0b4c8"/>
+      <stop offset="100%" style="stop-color:#a0b4c888"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 牌面背景 -->
+  <rect x="8" y="8" width="384" height="644" rx="20" ry="20" fill="url(#bg-minor-swords-11)" stroke="url(#border-minor-swords-11)" stroke-width="3"/>
+
+  <!-- 内边框 -->
+  <rect x="28" y="28" width="344" height="604" rx="14" ry="14" fill="none" stroke="#a0b4c8" stroke-width="1" opacity="0.3"/>
+
+  <!-- 牌号/罗马数字 -->
+  <text x="200" y="240" text-anchor="middle" font-family="Georgia, serif" font-size="72" font-weight="bold"
+        fill="#a0b4c8" opacity="0.9">P</text>
+
+  <!-- 花色符号 -->
+  <text x="200" y="310" text-anchor="middle" font-family="Arial, sans-serif" font-size="40"
+        fill="#a0b4c8" opacity="0.5">⚔</text>
+
+  <!-- 牌名（中文） -->
+  <text x="200" y="430" text-anchor="middle" font-family="'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif"
+        font-size="32" font-weight="bold" fill="#a0b4c8">宝剑侍从</text>
+
+  <!-- 英文名 -->
+  <text x="200" y="478" text-anchor="middle" font-family="Georgia,serif" font-size="16"
+        fill="#a0b4c8" opacity="0.5">Page of Swords</text>
+
+  <!-- 底部装饰线 -->
+  <line x1="80" y1="540" x2="320" y2="540" stroke="#a0b4c8" stroke-width="0.5" opacity="0.2"/>
+</svg>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=750, initial-scale=1">
+<style>
+{{ themeCSSVars }}
+{{ css }}
+</style>
+</head>
+<body>
+  <div class="poster-container poster-ready">
+    <!-- 标题 -->
+    <div class="poster-title">塔罗占卜</div>
+    <div class="poster-subtitle">{{ spreadName }} · {{ date }}</div>
+
+    <!-- 问题 -->
+    <div class="question-section">
+      <div class="question-label">你的问题</div>
+      <div class="question-text">{{ question }}</div>
+    </div>
+
+    <!-- 牌阵 -->
+    <div class="cards-section">
+      <div class="cards-grid">
+        {{{ cardsHTML }}}
+      </div>
+    </div>
+
+    <!-- AI 解读 -->
+    {{{ interpretationHTML }}}
+
+    <!-- 底部 -->
+    <div class="footer">
+      <div class="footer-brand">✦ TAROT ✦</div>
+      <div class="footer-text">AI塔罗占卜 · 仅供娱乐参考</div>
+    </div>
+  </div>
+</body>
+</html>

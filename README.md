@@ -1,0 +1,393 @@
+# tarot-backend
+
+塔罗牌后台统一服务 — AI 解读生成 + 海报 PNG 生成 + SQLite 请求日志记录
+
+整合自两个独立服务：
+- `tarot-reading-api`（Cloudflare Worker → AI 解读）
+- `tarot-poster-service`（Node.js Express + Puppeteer → 海报截图）
+
+## 快速开始
+
+### 本地开发
+
+```bash
+# 安装依赖
+pnpm install
+
+# 复制环境变量
+cp .env.example .env
+# 编辑 .env，填入 GEMINI_API_KEY
+
+# 启动开发服务器（tsx watch 热重载）
+pnpm run dev
+```
+
+服务默认监听 `http://localhost:3000`。
+
+### 生产构建
+
+```bash
+pnpm run build     # tsc 编译 + 复制模板文件
+pnpm start         # node dist/index.js
+```
+
+## API 端点
+
+| 方法 | 路径 | 说明 | 鉴权 | 日志 |
+|------|------|------|:---:|:---:|
+| `GET` | `/` | 服务信息 | ❌ | ❌ |
+| `GET` | `/health` | 健康检查（Gemini + Chromium） | ❌ | ❌ |
+| `GET` | `/metrics` | Prometheus 格式指标 | ❌ | ❌ |
+| `POST` | `/reading` | **AI 塔罗解读** | ❌ | ✅ 全文 |
+| `POST` | `/poster` | **海报生成 PNG** | ✅ 可选 | ✅ 请求元数据 |
+| `GET` | `/logs` | 查询解读日志（分页） | ❌ | ❌ |
+| `GET` | `/logs/:id` | 单条日志详情 | ❌ | ❌ |
+
+---
+
+### POST /reading — AI 塔罗解读
+
+请求体：
+
+```typescript
+{
+  "question": string,     // 用户问题（必填）
+  "cards": [{             // 牌数组（必填，至少1张）
+    "position": string,         // 牌阵位置，如"过去""现在""未来"
+    "name": string,             // 牌名，如"愚者""女皇"
+    "isUpright": boolean,       // true=正位, false=逆位
+    "uprightMeaning": string,   // 正位含义
+    "reversedMeaning": string,  // 逆位含义
+    "keywords": string[]        // 关键词
+  }]
+}
+```
+
+请求示例：
+
+```bash
+curl -X POST http://localhost:3000/reading \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "我最近的工作发展如何？",
+    "cards": [
+      {
+        "position": "过去",
+        "name": "愚者",
+        "isUpright": true,
+        "uprightMeaning": "新的开始、冒险、天真",
+        "reversedMeaning": "鲁莽、轻率、停滞",
+        "keywords": ["开始", "冒险", "天真"]
+      },
+      {
+        "position": "现在",
+        "name": "女皇",
+        "isUpright": true,
+        "uprightMeaning": "丰收、滋养、创造力",
+        "reversedMeaning": "依赖、空虚、创作枯竭",
+        "keywords": ["丰收", "滋养", "创造力"]
+      },
+      {
+        "position": "未来",
+        "name": "星星",
+        "isUpright": false,
+        "uprightMeaning": "希望、灵感、平静",
+        "reversedMeaning": "绝望、迷茫、失去方向",
+        "keywords": ["希望", "灵感", "平静"]
+      }
+    ]
+  }'
+```
+
+成功响应（200）：
+
+```json
+{
+  "reading": "📍 位置：过去 - 愚者...\n\n📍 位置：现在 - 女皇...\n\n📍 位置：未来 - 星星...\n\n✨ 综合解读...",
+  "model": "gemini-2.5-flash-lite",
+  "incomplete": false
+}
+```
+
+错误响应：
+
+| 状态码 | 说明 |
+|:------:|------|
+| 400 | 缺少必要字段 question 或 cards |
+| 429 | 所有 Gemini 模型今日配额已耗尽 |
+| 500 | GEMINI_API_KEY 未配置 |
+| 502 | Gemini API 不可用或所有模型调用失败 |
+
+---
+
+### POST /poster — 海报生成
+
+请求体：
+
+```typescript
+{
+  "cards": [{           // 牌数组（必填）
+    "name": string,               // 牌名
+    "image": string,              // 卡牌图片 URL
+    "position": string,           // 牌阵位置
+    "orientation": "upright" | "reversed",
+    "meaning": string,            // 含义文本
+    "keywords": string[],         // 关键词
+    "type": "major" | "minor" | "court",
+    "number": number              // 大牌序号
+  }],
+  "question": string,                             // 占卜问题
+  "spreadName": string,                           // 牌阵名称
+  "date": string,                                 // 日期
+  "interpretation"?: string,                      // 完整解读文本
+  "comprehensiveInterpretation"?: string,          // 综合解读（优先）
+  "theme"?: "dark" | "light",                     // 主题，默认按模板
+  "template"?: "default" | "minimal" | "wechat"   // 模板，默认 default
+}
+```
+
+成功响应：`image/png`（二进制图片）
+
+响应头：
+- `X-Cache: HIT` | `MISS`
+- `Cache-Control: public, max-age=3600`
+- `X-Render-Template-Ms`、`X-Render-Resource-Ms`、`X-Render-Screenshot-Ms`、`X-Render-Total-Ms`
+
+---
+
+### GET /logs — 日志查询
+
+```bash
+# 查询最近 20 条解读记录
+curl "http://localhost:3000/logs?target=reading&limit=20&page=1"
+
+# 查询最近 10 条海报记录
+curl "http://localhost:3000/logs?target=poster&limit=10"
+
+# 查看单条详情
+curl "http://localhost:3000/logs/<log-id>"
+```
+
+响应格式：
+
+```json
+{
+  "total": 42,
+  "page": 1,
+  "limit": 20,
+  "data": [
+    {
+      "id": "uuid",
+      "created_at": "2026-06-18T12:00:00.000Z",
+      "method": "POST",
+      "path": "/reading",
+      "target": "reading",
+      "status_code": 200,
+      "duration_ms": 3450,
+      "question": "我最近的工作发展如何？",
+      "cards_json": "[{\"position\":\"过去\",\"name\":\"愚者\",...}]",
+      "reading": "📍 位置：过去 - 愚者...",
+      "model": "gemini-2.5-flash-lite",
+      "incomplete": 0,
+      "is_error": 0,
+      "error_msg": null
+    }
+  ]
+}
+```
+
+查询参数：
+
+| 参数 | 默认 | 说明 |
+|------|:---:|------|
+| `page` | 1 | 页码 |
+| `limit` | 50 | 每页条数（最大 200） |
+| `target` | 全部 | 过滤：`reading` 或 `poster` |
+
+---
+
+### GET /health — 健康检查
+
+```json
+{
+  "status": "ok",
+  "gemini": "configured",
+  "cache": { "size": 5, "maxSize": 100, "hitRate": 0.3 },
+  "pool": { "available": 4, "active": 0, "waiting": 0, "maxPages": 4 },
+  "metrics": {
+    "totalRequests": 42,
+    "errors": 1,
+    "avgTotalMs": 3120
+  }
+}
+```
+
+## 环境变量
+
+| 变量 | 用途 | 默认值 | 必填 |
+|------|------|--------|:----:|
+| `PORT` | 服务端口 | `3000`（HF: `7860`） | |
+| `NODE_ENV` | 运行环境 | `development` | |
+| `GEMINI_API_KEY` | Google Gemini API 密钥 | — | **✅** |
+| `API_KEY` | API 鉴权密钥（Bearer Token） | 空（不鉴权） | |
+| `CORS_ORIGIN` | 跨域允许来源 | `*` | |
+| `DB_PATH` | SQLite 数据库文件路径 | `./data/tarot.db` | |
+| `LOG_RETENTION_DAYS` | 日志保留天数 | `30` | |
+| `PUPPETEER_EXECUTABLE_PATH` | Chromium 可执行文件路径 | 系统自动查找 | |
+| `PUPPETEER_ARGS` | Chromium 启动参数 | `--no-sandbox,...` | |
+| `CACHE_MAX_SIZE` | LRU 缓存最大条目数 | `100` | |
+| `CACHE_TTL_SECONDS` | 缓存 TTL（秒） | `3600` | |
+| `POSTER_WIDTH` | 海报宽度（px） | `750` | |
+| `POSTER_HEIGHT` | 海报高度（px） | `1334` | |
+| `POOL_MAX_PAGES` | 浏览器 Page 池大小 | `4` | |
+| `POOL_ACQUIRE_TIMEOUT_MS` | 获取 Page 超时（ms） | `30000` | |
+
+> `GEMINI_API_KEY` 是唯一必填变量，其余均有合理默认值。
+> Docker 部署时 `PUPPETEER_EXECUTABLE_PATH` 和 `PUPPETEER_ARGS` 已在 Dockerfile 中硬编码。
+
+## 数据库
+
+使用 SQLite（通过 `sql.js` WASM 实现，零编译依赖）。
+
+数据库文件位置：`DB_PATH` 环境变量指定，默认 `./data/tarot.db`。
+
+### reading_logs 表结构
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `id` | TEXT PK | UUID |
+| `created_at` | TEXT | ISO 8601 时间戳 |
+| `method` | TEXT | 请求方法 |
+| `path` | TEXT | 请求路径 |
+| `target` | TEXT | `reading` / `poster` |
+| `status_code` | INTEGER | HTTP 状态码 |
+| `duration_ms` | INTEGER | 处理耗时 |
+| `ip_address` | TEXT | 客户端 IP |
+| `question` | TEXT | 用户问题（仅 /reading） |
+| `cards_json` | TEXT | 牌面 JSON（仅 /reading） |
+| `reading` | TEXT | AI 回复原文（仅 /reading） |
+| `model` | TEXT | 使用的 Gemini 模型 |
+| `incomplete` | INTEGER | 是否截断或不完整 |
+| `is_error` | INTEGER | 是否错误 |
+| `error_msg` | TEXT | 错误详情 |
+
+> `/poster` 请求不存储 PNG 二进制，仅记录请求元数据和响应状态。
+
+## 部署
+
+### Docker
+
+```bash
+docker build -t tarot-backend .
+docker run -d -p 3000:3000 \
+  -e GEMINI_API_KEY=your-key \
+  -e API_KEY=optional-auth-key \
+  tarot-backend
+```
+
+### HuggingFace Spaces
+
+```bash
+docker build -f Dockerfile.hf -t tarot-backend .
+docker run -p 7860:7860 \
+  -e GEMINI_API_KEY=your-key \
+  tarot-backend
+```
+
+在 HF Spaces 上部署后，需在 Settings → Repository secrets 中设置环境变量：
+
+| 变量 | 建议 |
+|------|------|
+| `GEMINI_API_KEY` | 🔴 必填，设为 Secret |
+| `API_KEY` | 🟡 建议设置，保护 `/poster` 端点 |
+
+> HF Spaces 平台已自动设置 `PORT=7860`，不要在 Variables 中手动设置。
+
+## 配置验证清单
+
+```bash
+# 1. 服务信息
+curl http://localhost:3000/
+# 期望：{"service":"tarot-backend","version":"1.0.0","status":"running"}
+
+# 2. 健康检查
+curl http://localhost:3000/health
+# 期望：{"status":"ok","gemini":"configured",...}
+
+# 3. 参数校验
+curl -s -X POST http://localhost:3000/reading \
+  -H "Content-Type: application/json" \
+  -d '{}'
+# 期望：HTTP 400 + {"error":"Missing question or cards"}
+
+# 4. AI 解读（需要有效 GEMINI_API_KEY）
+curl -s -X POST http://localhost:3000/reading \
+  -H "Content-Type: application/json" \
+  -d '{"question":"测试","cards":[{"position":"现状","name":"愚者","isUpright":true,"uprightMeaning":"开始","reversedMeaning":"停滞","keywords":["开始"]}]}'
+# 期望：HTTP 200 + {"reading":"...","model":"gemini-2.5-flash-lite","incomplete":false}
+
+# 5. 日志查询
+curl http://localhost:3000/logs?limit=5
+# 期望：HTTP 200 + {"total":N,"page":1,"limit":5,"data":[...]}
+
+# 6. 海报生成
+curl -s -X POST http://localhost:3000/poster \
+  -H "Content-Type: application/json" \
+  -d '{"cards":[{"name":"愚者","position":"现状","orientation":"upright","meaning":"新的开始","keywords":["开始"],"type":"major","number":0}],"question":"测试","spreadName":"单张","date":"2026-06-18"}' -o test-output.png && file test-output.png
+# 期望：PNG image data, 750 x 1334, ...
+```
+
+## 技术栈
+
+| 类别 | 技术 |
+|------|------|
+| 运行时 | Node.js 20 |
+| 语言 | TypeScript（strict mode） |
+| 框架 | Express |
+| AI | Google Gemini API |
+| 截图 | Puppeteer（无头 Chromium） |
+| 缓存 | LRU 内存缓存 |
+| 数据库 | SQLite（sql.js WASM） |
+| 日志 | pino 结构化日志 |
+| 包管理 | pnpm |
+| 部署 | Docker / HuggingFace Spaces |
+
+## 项目结构
+
+```
+tarot-backend/
+├── src/
+│   ├── index.ts          # Express 入口，路由注册
+│   ├── config.ts         # 统一环境变量管理
+│   ├── logger.ts         # pino 结构化日志
+│   ├── reading/          # AI 解读模块
+│   │   ├── types.ts      # 请求/响应类型
+│   │   ├── prompt.ts     # 提示词模板
+│   │   ├── models.ts     # 模型选择、配额、调用
+│   │   └── handler.ts    # Express 路由处理器
+│   ├── poster/           # 海报生成模块（复制自 poster-service）
+│   │   ├── types.ts      # PosterData 类型
+│   │   ├── template.ts   # 海报 HTML 生成
+│   │   ├── render.ts     # Puppeteer 截图
+│   │   ├── engine.ts     # 模板引擎
+│   │   ├── theme.ts      # 设计令牌系统
+│   │   ├── browser-pool.ts # Page 连接池
+│   │   └── templates/    # HTML/CSS 模板文件
+│   ├── db/               # SQLite 数据库
+│   │   ├── index.ts      # 初始化 + 建表
+│   │   └── reading-log.ts # 日志 CRUD
+│   ├── gateway/          # 网关中间件
+│   │   └── logging.ts    # 请求/响应拦截 → SQLite
+│   ├── middleware/        # 通用中间件
+│   │   ├── cors.ts       # CORS
+│   │   └── auth.ts       # Bearer Token 鉴权
+│   ├── cache/            # LRU 内存缓存
+│   │   └── index.ts      # SHA256 缓存键
+│   └── monitor/          # 性能监控
+│       ├── index.ts      # 统一导出
+│       └── metrics.ts    # Prometheus 指标
+├── assets/cards/         # 78 张塔罗牌 SVG
+├── Dockerfile            # 标准多阶段构建
+├── Dockerfile.hf         # HF Spaces 专用
+└── package.json
+```
