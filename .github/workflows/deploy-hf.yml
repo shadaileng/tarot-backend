@@ -1,0 +1,29 @@
+name: Deploy to HuggingFace Spaces
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'src/**'
+      - 'assets/**'
+      - 'scripts/entrypoint.sh'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'tsconfig.json'
+      - 'Dockerfile.hf'
+      - 'README.hf.md'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to HuggingFace Spaces
+        run: bash scripts/deploy-hf.sh
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          HF_SPACE_NAME: ${{ secrets.HF_SPACE_NAME }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

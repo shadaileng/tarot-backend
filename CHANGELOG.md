@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-06-18
+
+### Added
+
+- CI 工作流（`ci.yml`）：自动 typecheck + build 验证
+- HF Spaces 部署工作流（`deploy-hf.yml`）：自动推送代码并设置 GEMINI_API_KEY Secret
+- 部署脚本三件套：`scripts/deploy-hf.sh`（bash）、`.ps1`（PowerShell）、`.bat`（批处理）
+- `scripts/entrypoint.sh`：容器入口脚本，启动时打印服务信息并检查 Gemini/Chromium 状态
+- `README.hf.md`：HF Spaces 首页，包含 API 参考和环境变量声明
+- `.env.hf.example`：HF 部署配置模板
+
+### Changed
+
+- `Dockerfile.hf`：改用 ENTRYPOINT 模式（`/entrypoint.sh` + `CMD`），与 poster-service 对齐
+- `README.hf.md`：front matter 添加 `env` 段声明 GEMINI_API_KEY 和 API_KEY
+
 ## [1.0.1] - 2026-06-18
 
 ### Fixed
