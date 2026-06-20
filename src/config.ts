@@ -5,29 +5,30 @@ export interface ConfigMeta {
   editable: boolean
   sensitive?: boolean
   type: 'string' | 'number'
+  defaultValue: string
 }
 
 export const configMeta: ConfigMeta[] = [
-  { key: 'PORT', envKey: 'PORT', group: '系统配置', editable: false, type: 'number' },
-  { key: 'NODE_ENV', envKey: 'NODE_ENV', group: '系统配置', editable: false, type: 'string' },
+  { key: 'PORT', envKey: 'PORT', group: '系统配置', editable: false, type: 'number', defaultValue: '3000' },
+  { key: 'NODE_ENV', envKey: 'NODE_ENV', group: '系统配置', editable: false, type: 'string', defaultValue: 'development' },
 
-  { key: 'GEMINI_API_KEY', envKey: 'GEMINI_API_KEY', group: 'AI 配置', editable: true, sensitive: true, type: 'string' },
+  { key: 'GEMINI_API_KEY', envKey: 'GEMINI_API_KEY', group: 'AI 配置', editable: true, sensitive: true, type: 'string', defaultValue: '' },
 
-  { key: 'API_KEY', envKey: 'API_KEY', group: '安全配置', editable: false, sensitive: true, type: 'string' },
-  { key: 'CORS_ORIGIN', envKey: 'CORS_ORIGIN', group: '安全配置', editable: false, type: 'string' },
+  { key: 'API_KEY', envKey: 'API_KEY', group: '安全配置', editable: false, sensitive: true, type: 'string', defaultValue: '' },
+  { key: 'CORS_ORIGIN', envKey: 'CORS_ORIGIN', group: '安全配置', editable: false, type: 'string', defaultValue: '*' },
 
-  { key: 'DB_PATH', envKey: 'DB_PATH', group: '数据库', editable: false, type: 'string' },
+  { key: 'DB_PATH', envKey: 'DB_PATH', group: '数据库', editable: false, type: 'string', defaultValue: './data/tarot.db' },
 
-  { key: 'CACHE_MAX_SIZE', envKey: 'CACHE_MAX_SIZE', group: '缓存配置', editable: true, type: 'number' },
-  { key: 'CACHE_TTL_SECONDS', envKey: 'CACHE_TTL_SECONDS', group: '缓存配置', editable: true, type: 'number' },
+  { key: 'CACHE_MAX_SIZE', envKey: 'CACHE_MAX_SIZE', group: '缓存配置', editable: true, type: 'number', defaultValue: '100' },
+  { key: 'CACHE_TTL_SECONDS', envKey: 'CACHE_TTL_SECONDS', group: '缓存配置', editable: true, type: 'number', defaultValue: '3600' },
 
-  { key: 'POOL_MAX_PAGES', envKey: 'POOL_MAX_PAGES', group: '性能配置', editable: true, type: 'number' },
-  { key: 'POOL_ACQUIRE_TIMEOUT_MS', envKey: 'POOL_ACQUIRE_TIMEOUT_MS', group: '性能配置', editable: true, type: 'number' },
+  { key: 'POOL_MAX_PAGES', envKey: 'POOL_MAX_PAGES', group: '性能配置', editable: true, type: 'number', defaultValue: '4' },
+  { key: 'POOL_ACQUIRE_TIMEOUT_MS', envKey: 'POOL_ACQUIRE_TIMEOUT_MS', group: '性能配置', editable: true, type: 'number', defaultValue: '30000' },
 
-  { key: 'POSTER_WIDTH', envKey: 'POSTER_WIDTH', group: '海报配置', editable: true, type: 'number' },
-  { key: 'POSTER_HEIGHT', envKey: 'POSTER_HEIGHT', group: '海报配置', editable: true, type: 'number' },
+  { key: 'POSTER_WIDTH', envKey: 'POSTER_WIDTH', group: '海报配置', editable: true, type: 'number', defaultValue: '750' },
+  { key: 'POSTER_HEIGHT', envKey: 'POSTER_HEIGHT', group: '海报配置', editable: true, type: 'number', defaultValue: '1334' },
 
-  { key: 'LOG_RETENTION_DAYS', envKey: 'LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number' },
+  { key: 'LOG_RETENTION_DAYS', envKey: 'LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '30' },
 ]
 
 export const config = {
@@ -71,7 +72,7 @@ export const config = {
 export function getConfigDefaults(): Record<string, string> {
   const defaults: Record<string, string> = {}
   for (const meta of configMeta) {
-    defaults[meta.envKey] = process.env[meta.envKey] || ''
+    defaults[meta.envKey] = process.env[meta.envKey] || meta.defaultValue
   }
   return defaults
 }
