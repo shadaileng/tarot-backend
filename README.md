@@ -303,6 +303,37 @@ docker run -p 7860:7860 \
 
 > HF Spaces 平台已自动设置 `PORT=7860`，不要在 Variables 中手动设置。
 
+## 踩坑记录
+
+### Cloudflare Worker 代理层 CORS 问题
+
+**背景：** HF Space 平台自身的响应头存在 CORS 限制（缺少必要的 CORS 头），因此使用 Cloudflare Worker 作为反向代理，在 Worker 层统一添加 CORS 响应头，覆盖 HF Space 的原始响应。
+
+**问题现象：** 前端调用 PUT 接口（如配置更新）时，浏览器报 CORS 错误：`Method PUT is not allowed by Access-Control-Allow-Methods`。
+
+**根本原因：** Cloudflare Worker 会用自己的 CORS 响应头**覆盖** HF Space 后端返回的 CORS 头。如果 Worker 代码中硬编码的 `Access-Control-Allow-Methods` 缺少 PUT 方法，即使后端正确设置了 PUT，浏览器仍会被拦截。
+
+**解决方案：** 在 Worker 代码中添加 PUT 到允许的方法列表：
+
+```javascript
+// ❌ 错误：缺少 PUT
+corsHeaders.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+
+// ✅ 正确：包含 PUT
+corsHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
+```
+
+**排查方法：** 使用 curl 测试 OPTIONS 预检请求，检查响应头：
+
+```bash
+curl -X OPTIONS \
+  -H "Origin: https://your-admin-domain.com" \
+  -H "Access-Control-Request-Method: PUT" \
+  https://your-backend-domain.com/api/config/ANY_KEY -v
+```
+
+检查 `Access-Control-Allow-Methods` 是否包含 PUT。
+
 ## 配置验证清单
 
 ```bash
