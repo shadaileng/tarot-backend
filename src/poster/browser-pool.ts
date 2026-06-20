@@ -120,6 +120,13 @@ export class BrowserPool {
     }
   }
 
+  /** 动态更新池配置 */
+  updateConfig(maxPages: number, acquireTimeoutMs: number): void {
+    this.maxPages = maxPages
+    this.acquireTimeoutMs = acquireTimeoutMs
+    this.processQueue()
+  }
+
   /** 处理等待队列：有空闲配额时创建新 Page 分发给等待者 */
   private processQueue(): void {
     while (this.waitQueue.length > 0 && this.activePages.size < this.maxPages) {
@@ -183,6 +190,16 @@ export async function getPoolStats(): Promise<PoolStats | null> {
   try {
     const pool = await poolPromise
     return pool.stats
+  } catch {
+    return null
+  }
+}
+
+/** 获取当前池实例（未初始化时返回 null） */
+export async function getPoolInstance(): Promise<BrowserPool | null> {
+  if (!poolPromise) return null
+  try {
+    return await poolPromise
   } catch {
     return null
   }

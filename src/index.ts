@@ -8,7 +8,7 @@ import { authMiddleware } from './middleware/auth.js'
 import { loggingMiddleware } from './gateway/logging.js'
 import { buildPosterHTML } from './poster/template.js'
 import { renderPoster } from './poster/render.js'
-import { getPoolStats } from './poster/browser-pool.js'
+import { getPoolStats, getPoolInstance } from './poster/browser-pool.js'
 import { posterCache } from './cache/index.js'
 import { getTemplate } from './poster/templates/index.js'
 import { metrics } from './monitor/index.js'
@@ -215,6 +215,13 @@ app.put('/api/config/:key', authMiddleware, async (req, res) => {
 
   if (key === 'CACHE_MAX_SIZE' || key === 'CACHE_TTL_SECONDS') {
     posterCache.updateConfig(config.cache.maxSize, config.cache.ttlSeconds)
+  }
+
+  if (key === 'POOL_MAX_PAGES' || key === 'POOL_ACQUIRE_TIMEOUT_MS') {
+    const pool = await getPoolInstance()
+    if (pool) {
+      pool.updateConfig(config.pool.maxPages, config.pool.acquireTimeoutMs)
+    }
   }
 
   log.info({ key, value: meta.sensitive ? '***' : stringValue }, 'Config updated')
