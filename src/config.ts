@@ -25,9 +25,6 @@ export const configMeta: ConfigMeta[] = [
   { key: 'POOL_MAX_PAGES', envKey: 'POOL_MAX_PAGES', group: '性能配置', editable: true, type: 'number', defaultValue: '4' },
   { key: 'POOL_ACQUIRE_TIMEOUT_MS', envKey: 'POOL_ACQUIRE_TIMEOUT_MS', group: '性能配置', editable: true, type: 'number', defaultValue: '30000' },
 
-  { key: 'POSTER_WIDTH', envKey: 'POSTER_WIDTH', group: '海报配置', editable: true, type: 'number', defaultValue: '750' },
-  { key: 'POSTER_HEIGHT', envKey: 'POSTER_HEIGHT', group: '海报配置', editable: true, type: 'number', defaultValue: '1334' },
-
   { key: 'LOG_RETENTION_DAYS', envKey: 'LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '30' },
 ]
 
@@ -51,11 +48,6 @@ export const config = {
   cache: {
     maxSize: parseInt(process.env.CACHE_MAX_SIZE || '100', 10),
     ttlSeconds: parseInt(process.env.CACHE_TTL_SECONDS || '3600', 10),
-  },
-
-  poster: {
-    width: parseInt(process.env.POSTER_WIDTH || '750', 10),
-    height: parseInt(process.env.POSTER_HEIGHT || '1334', 10),
   },
 
   pool: {
@@ -110,12 +102,6 @@ export function updateConfig(key: string, value: string): void {
       break
     case 'POOL_ACQUIRE_TIMEOUT_MS':
       config.pool.acquireTimeoutMs = parseInt(value, 10)
-      break
-    case 'POSTER_WIDTH':
-      config.poster.width = parseInt(value, 10)
-      break
-    case 'POSTER_HEIGHT':
-      config.poster.height = parseInt(value, 10)
       break
     case 'LOG_RETENTION_DAYS':
       config.db.retentionDays = parseInt(value, 10)

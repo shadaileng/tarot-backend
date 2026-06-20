@@ -237,8 +237,6 @@ curl "http://localhost:3000/logs/<log-id>"
 | `PUPPETEER_ARGS` | Chromium 启动参数 | `--no-sandbox,...` | |
 | `CACHE_MAX_SIZE` | LRU 缓存最大条目数 | `100` | |
 | `CACHE_TTL_SECONDS` | 缓存 TTL（秒） | `3600` | |
-| `POSTER_WIDTH` | 海报宽度（px） | `750` | |
-| `POSTER_HEIGHT` | 海报高度（px） | `1334` | |
 | `POOL_MAX_PAGES` | 浏览器 Page 池大小 | `4` | |
 | `POOL_ACQUIRE_TIMEOUT_MS` | 获取 Page 超时（ms） | `30000` | |
 

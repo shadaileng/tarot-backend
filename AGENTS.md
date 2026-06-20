@@ -222,7 +222,6 @@ interface ReadingRequestBody {
 | `PUPPETEER_ARGS` | Chromium 启动参数 | `--no-sandbox,...` | |
 | `CACHE_MAX_SIZE` | 缓存条目上限 | `100` | |
 | `CACHE_TTL_SECONDS` | 缓存 TTL | `3600` | |
-| `POSTER_WIDTH` / `POSTER_HEIGHT` | 海报尺寸 | `750` × `1334` | |
 | `POOL_MAX_PAGES` | Page 池大小 | `4` | |
 | `POOL_ACQUIRE_TIMEOUT_MS` | Page 获取超时 | `30000` | |
 
