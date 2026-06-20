@@ -30,6 +30,7 @@
 
 body {
   width: 750px;
+  zoom: 0.8;
   font-family: var(--t-font-family);
   background: var(--t-color-bg-gradient);
   color: var(--t-color-text);

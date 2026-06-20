@@ -142,9 +142,9 @@ export async function renderPoster(html: string, width?: number): Promise<{ buff
   try {
     // 设置视口；宽度由模板决定，高度仅作初始值，fullPage 截图自动捕获全高
     await page.setViewport({
-      width: width ?? 750,
+      width: width ?? 600,
       height: 1334,
-      deviceScaleFactor: 1.5,
+      deviceScaleFactor: 2,
     })
 
     // 阶段 1：加载 HTML（使用 'domcontentloaded'，后续有独立的资源就绪检查）
