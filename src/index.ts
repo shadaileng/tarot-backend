@@ -159,7 +159,7 @@ app.get('/logs/:id', async (req, res) => {
   res.json(log)
 })
 
-app.get('/config', async (_req, res) => {
+app.get('/api/config', async (_req, res) => {
   const dbConfig = await getAllConfig()
   const groups = new Map<string, any[]>()
 
@@ -184,7 +184,7 @@ app.get('/config', async (_req, res) => {
   res.json({ groups: Array.from(groups.entries()).map(([name, items]) => ({ name, items })) })
 })
 
-app.put('/config/:key', authMiddleware, async (req, res) => {
+app.put('/api/config/:key', authMiddleware, async (req, res) => {
   const { key } = req.params
   const { value } = req.body as { value: string }
 
