@@ -13,11 +13,16 @@ interface CacheEntry {
 
 export class LRUCache {
   private cache: Map<string, CacheEntry>
-  readonly maxSize: number
-  readonly ttlMs: number
+  maxSize: number
+  ttlMs: number
 
   constructor(maxSize: number = 100, ttlSeconds: number = 3600) {
     this.cache = new Map()
+    this.maxSize = maxSize
+    this.ttlMs = ttlSeconds * 1000
+  }
+
+  updateConfig(maxSize: number, ttlSeconds: number): void {
     this.maxSize = maxSize
     this.ttlMs = ttlSeconds * 1000
   }

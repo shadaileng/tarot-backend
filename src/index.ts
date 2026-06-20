@@ -213,6 +213,10 @@ app.put('/api/config/:key', authMiddleware, async (req, res) => {
   await upsertConfig(key, stringValue, 'user')
   updateConfig(key, stringValue)
 
+  if (key === 'CACHE_MAX_SIZE' || key === 'CACHE_TTL_SECONDS') {
+    posterCache.updateConfig(config.cache.maxSize, config.cache.ttlSeconds)
+  }
+
   log.info({ key, value: meta.sensitive ? '***' : stringValue }, 'Config updated')
 
   res.json({ key, value: meta.sensitive ? maskSensitiveValue(key, stringValue) : stringValue, source: 'user' })
