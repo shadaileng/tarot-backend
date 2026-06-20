@@ -61,6 +61,15 @@ function initSchema(database: Database): void {
   `)
   database.run('CREATE INDEX IF NOT EXISTS idx_logs_created_at ON reading_logs(created_at DESC)')
   database.run('CREATE INDEX IF NOT EXISTS idx_logs_target ON reading_logs(target)')
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS system_config (
+      key         TEXT PRIMARY KEY,
+      value       TEXT NOT NULL,
+      source      TEXT NOT NULL DEFAULT 'env',
+      updated_at  TEXT NOT NULL
+    )
+  `)
 }
 
 export function closeDb(): void {

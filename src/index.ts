@@ -2,7 +2,7 @@ import 'dotenv/config'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import express, { type Request, type Response, type NextFunction } from 'express'
-import { config } from './config.js'
+import { config, configMeta, updateConfig, maskSensitiveValue, getConfigDefaults } from './config.js'
 import { corsMiddleware } from './middleware/cors.js'
 import { authMiddleware } from './middleware/auth.js'
 import { loggingMiddleware } from './gateway/logging.js'
@@ -15,6 +15,7 @@ import { metrics } from './monitor/index.js'
 import { getLogger } from './logger.js'
 import { readingHandler } from './reading/handler.js'
 import { queryLogs, getLogById } from './db/reading-log.js'
+import { getAllConfig, upsertConfig, initDefaultConfig } from './db/config.js'
 import { getDb } from './db/index.js'
 import type { PosterData } from './poster/types.js'
 
@@ -158,6 +159,65 @@ app.get('/logs/:id', async (req, res) => {
   res.json(log)
 })
 
+app.get('/config', async (_req, res) => {
+  const dbConfig = await getAllConfig()
+  const groups = new Map<string, any[]>()
+
+  for (const meta of configMeta) {
+    const entry = dbConfig.get(meta.envKey)
+    const rawValue = entry?.value ?? process.env[meta.envKey] ?? ''
+    const value = meta.sensitive ? maskSensitiveValue(meta.envKey, rawValue) : rawValue
+
+    if (!groups.has(meta.group)) {
+      groups.set(meta.group, [])
+    }
+    groups.get(meta.group)!.push({
+      key: meta.envKey,
+      label: meta.envKey,
+      value,
+      source: entry?.source ?? 'env',
+      editable: meta.editable,
+      type: meta.type,
+    })
+  }
+
+  res.json({ groups: Array.from(groups.entries()).map(([name, items]) => ({ name, items })) })
+})
+
+app.put('/config/:key', authMiddleware, async (req, res) => {
+  const { key } = req.params
+  const { value } = req.body as { value: string }
+
+  const meta = configMeta.find((m) => m.envKey === key)
+  if (!meta) {
+    res.status(404).json({ error: `Unknown config key: ${key}` })
+    return
+  }
+
+  if (!meta.editable) {
+    res.status(403).json({ error: `Config key '${key}' is not editable` })
+    return
+  }
+
+  if (value === undefined || value === null) {
+    res.status(400).json({ error: 'Missing value' })
+    return
+  }
+
+  const stringValue = String(value)
+  if (meta.type === 'number' && isNaN(Number(stringValue))) {
+    res.status(400).json({ error: `Invalid number value for ${key}` })
+    return
+  }
+
+  await upsertConfig(key, stringValue, 'user')
+  updateConfig(key, stringValue)
+
+  log.info({ key, value: meta.sensitive ? '***' : stringValue }, 'Config updated')
+
+  res.json({ key, value: meta.sensitive ? maskSensitiveValue(key, stringValue) : stringValue, source: 'user' })
+})
+
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   log.error({ err }, 'Unhandled error')
   res.status(500).json({ error: 'Internal server error' })
@@ -166,6 +226,10 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 async function start(): Promise<void> {
   await getDb()
   log.info({ path: config.db.path }, 'Database initialized')
+
+  const defaults = getConfigDefaults()
+  await initDefaultConfig(defaults)
+  log.info('Default config initialized')
 
   app.listen(config.port, '0.0.0.0', () => {
     log.info({ port: config.port }, 'Tarot Backend Service running')
