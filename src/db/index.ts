@@ -2,7 +2,10 @@ import initSqlJs from 'sql.js'
 import fs from 'fs'
 import path from 'path'
 import { config } from '../config.js'
+import { getLogger } from '../logger.js'
 import type { SqlJsStatic, Database } from 'sql.js'
+
+const log = getLogger('DB')
 
 let db: Database | null = null
 let SQL: SqlJsStatic | null = null
@@ -26,7 +29,8 @@ export function saveDb(): void {
 export async function getDb(): Promise<Database> {
   if (!db) {
     const sql = await initSql()
-    if (fs.existsSync(config.db.path)) {
+    const existed = fs.existsSync(config.db.path)
+    if (existed) {
       const buffer = fs.readFileSync(config.db.path)
       db = new sql.Database(buffer)
     } else {
@@ -35,6 +39,7 @@ export async function getDb(): Promise<Database> {
     db.run('PRAGMA journal_mode=WAL')
     initSchema(db)
     saveDb()
+    log.info({ path: config.db.path, new: !existed }, 'Database initialized')
   }
   return db
 }

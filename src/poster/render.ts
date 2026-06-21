@@ -61,6 +61,7 @@ async function getBrowser(): Promise<Browser> {
 
   // ② 启动新浏览器
   log.info('Launching browser...')
+  const launchStart = Date.now()
   browserPromise = puppeteer.launch({
     headless: true,
     executablePath: config.puppeteer.executablePath,
@@ -69,6 +70,12 @@ async function getBrowser(): Promise<Browser> {
 
   // ③ 注册 disconnected 事件监听（主动感知崩溃）
   const browser = await browserPromise
+  log.info({
+    executablePath: config.puppeteer.executablePath || 'system default',
+    args: config.puppeteer.args,
+    headless: true,
+    launchMs: Date.now() - launchStart,
+  }, 'Browser launched')
   browser.on('disconnected', () => {
     log.warn('Browser disconnected event fired, resetting...')
     browserPromise = null

@@ -106,6 +106,7 @@ async function fetchAvailableModels(apiKey: string): Promise<{ up: boolean; deta
       { method: 'GET' },
     )
     if (!res.ok) {
+      log.warn({ status: res.status }, 'Gemini model list fetch failed')
       return { up: false, detail: `Gemini API returned ${res.status}`, models: [] }
     }
     const data: any = await res.json()
@@ -119,8 +120,10 @@ async function fetchAvailableModels(apiKey: string): Promise<{ up: boolean; deta
         const name: string = m.name || ''
         return name.replace(/^models\//, '')
       })
+    log.info({ modelCount: models.length }, 'Gemini model list refreshed')
     return { up: true, detail: 'Gemini API available', models }
   } catch (e: any) {
+    log.warn({ err: e }, 'Gemini model list fetch failed (network)')
     return { up: false, detail: e.message || 'Gemini API unreachable', models: [] }
   }
 }

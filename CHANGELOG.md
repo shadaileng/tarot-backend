@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-06-21
+
+### Added
+
+- **优雅关闭日志**：SIGTERM/SIGINT 监听输出 `log.info`，便于运维排查服务生命周期
+- **DB 模块日志**：`getDb()` 成功后输出数据库路径和是否新建标记，区分首次初始化与重启加载
+- **配置来源分组日志**：启动时按 `from_env` / `from_default` / `from_user` 分组输出所有配置项来源
+- **Puppeteer 启动详情日志**：浏览器 launch 成功后输出 `executablePath`、`args`、`launchMs`
+- **Gemini 健康探测日志**：`fetchAvailableModels` 成功/失败时分别输出 `log.info`（模型数量）和 `log.warn`
+
+### Changed
+
+- 启动摘要中 `dbPath` 不再重复输出（由 DB 模块日志单独报告），新增 `restoredUserConfig` 字段
+- 启动摘要日志消息从 `'Startup configuration summary'` 改为 `'Service started'`
+
 ## [1.5.0] - 2026-06-21
 
 ### Added

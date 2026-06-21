@@ -300,6 +300,30 @@ async function start(): Promise<void> {
     log.info({ restored }, 'Restored user config from database')
   }
 
+  // 输出配置来源分组（from_env / from_default / from_user）
+  {
+    const fromEnv: string[] = []
+    const fromDefault: string[] = []
+    const fromUser: string[] = []
+    const restoredSet = new Set(restored)
+    for (const meta of configMeta) {
+      if (restoredSet.has(meta.envKey)) {
+        fromUser.push(meta.envKey)
+      } else if (process.env[meta.envKey] && process.env[meta.envKey] !== meta.defaultValue) {
+        fromEnv.push(meta.envKey)
+      } else {
+        fromDefault.push(meta.envKey)
+      }
+    }
+    if (fromEnv.length > 0 || fromDefault.length > 0 || fromUser.length > 0) {
+      log.info({
+        fromEnv,
+        fromDefault,
+        fromUser,
+      }, 'Configuration source summary')
+    }
+  }
+
   app.listen(config.port, '0.0.0.0', () => {
     log.info({
       port: config.port,
@@ -324,6 +348,17 @@ async function start(): Promise<void> {
 start().catch((err) => {
   log.error({ err }, 'Failed to start server')
   process.exit(1)
+})
+
+// ========== 优雅关闭 ==========
+process.on('SIGTERM', () => {
+  log.info('Received SIGTERM, shutting down gracefully...')
+  process.exit(0)
+})
+
+process.on('SIGINT', () => {
+  log.info('Received SIGINT, shutting down gracefully...')
+  process.exit(0)
 })
 
 export default app
