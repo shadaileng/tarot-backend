@@ -242,13 +242,13 @@ if (key === 'POOL_MAX_PAGES' || key === 'POOL_ACQUIRE_TIMEOUT_MS') {
 
 | # | 任务 | 状态 |
 |---|------|------|
-| 4.1 | TypeScript 类型检查通过 (`npm run typecheck` 或 `npx tsc --noEmit`) | ⬜ 待完成 |
-| 4.2 | 启动服务，验证启动横幅完整性 | ⬜ 待完成 |
-| 4.3 | 发起正常 `/reading` 请求，验证访问日志 + 成功日志 | ⬜ 待完成 |
-| 4.4 | 发起错误 `/reading` 请求（无 API Key），验证错误日志 | ⬜ 待完成 |
-| 4.5 | 连续请求同一 `/poster`，验证缓存 HIT/MISS 日志 | ⬜ 待完成 |
-| 4.6 | 发送 SIGTERM，验证优雅关闭日志 | ⬜ 待完成 |
-| 4.7 | 检查日志级别，确保 `log.debug` 在 production 不输出 | ⬜ 待完成 |
+| 4.1 | TypeScript 类型检查通过 (`npm run typecheck` 或 `npx tsc --noEmit`) | ✅ 已完成 |
+| 4.2 | 启动服务，验证启动横幅完整性 | ✅ 已完成 |
+| 4.3 | 发起正常 `/reading` 请求，验证访问日志 + 成功日志 | ✅ 已完成 |
+| 4.4 | 发起错误 `/reading` 请求（无 API Key），验证错误日志 | ✅ 已完成 |
+| 4.5 | 连续请求同一 `/poster`，验证缓存 HIT/MISS 日志 | ✅ 已完成 |
+| 4.6 | 发送 SIGTERM，验证优雅关闭日志 | ✅ 已完成 |
+| 4.7 | 检查日志级别，确保 `log.debug` 在 production 不输出 | ✅ 已完成 |
 
 ---
 
@@ -283,5 +283,5 @@ if (key === 'POOL_MAX_PAGES' || key === 'POOL_ACQUIRE_TIMEOUT_MS') {
 | 阶段 1 (P0) | 100% | ✅ 已完成 |
 | 阶段 2 (P1) | 100% | ✅ 已完成 |
 | 阶段 3 (P2) | 100% | ✅ 已完成 |
-| 阶段 4 (验证) | 0% | ⬜ 待开始 |
-| **总计** | **75%** | |
+| 阶段 4 (验证) | 100% | ✅ 已完成 |
+| **总计** | **100%** | ✅ 全部完成 |
