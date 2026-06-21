@@ -187,9 +187,9 @@ if (!res.ok) {
 
 | # | 任务 | 文件 | 状态 |
 |---|------|------|------|
-| 3.1 | **请求 ID 透传** — 在 `loggingMiddleware` 中把 `logId` 注入到 `req` 上，下游 handler 可用 `log.child({ logId })` 串联 | `src/gateway/logging.ts` | ⬜ 待完成 |
-| 3.2 | **周期状态日志** — 每 60s 输出一条 `log.info` 含 metrics snapshot（健康自检） | `src/index.ts` | ⬜ 待完成 |
-| 3.3 | **配置热更新通知** — 更新 cache/pool 配置时，输出是否已通知到对应模块 | `src/index.ts` `/api/config/:key` | ⬜ 待完成 |
+| 3.1 | **请求 ID 透传** — 在 `loggingMiddleware` 中把 `logId` 注入到 `req` 上，下游 handler 可用 `log.child({ logId })` 串联 | `src/gateway/logging.ts` | ✅ 已完成 |
+| 3.2 | **周期状态日志** — 每 60s 输出一条 `log.info` 含 metrics snapshot（健康自检） | `src/index.ts` | ✅ 已完成 |
+| 3.3 | **配置热更新通知** — 更新 cache/pool 配置时，输出是否已通知到对应模块 | `src/index.ts` `/api/config/:key` | ✅ 已完成 |
 
 ### 详细实现要点
 
@@ -282,6 +282,6 @@ if (key === 'POOL_MAX_PAGES' || key === 'POOL_ACQUIRE_TIMEOUT_MS') {
 |------|--------|------|
 | 阶段 1 (P0) | 100% | ✅ 已完成 |
 | 阶段 2 (P1) | 100% | ✅ 已完成 |
-| 阶段 3 (P2) | 0% | ⬜ 待开始 |
+| 阶段 3 (P2) | 100% | ✅ 已完成 |
 | 阶段 4 (验证) | 0% | ⬜ 待开始 |
-| **总计** | **50%** | |
+| **总计** | **75%** | |
