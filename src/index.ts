@@ -309,7 +309,7 @@ async function start(): Promise<void> {
       geminiKey: config.geminiApiKey ? '***configured***' : 'NOT SET',
       apiKey: config.apiKey ? '***configured***' : 'NOT SET',
       corsOrigin: config.corsOrigin,
-      dbPath: config.db.path,
+      restoredUserConfig: restored.length > 0 ? restored : undefined,
       cacheMaxSize: config.cache.maxSize,
       cacheTtlSeconds: config.cache.ttlSeconds,
       poolMaxPages: config.pool.maxPages,
@@ -317,7 +317,7 @@ async function start(): Promise<void> {
       puppeteerPath: config.puppeteer.executablePath || '(system default)',
       puppeteerArgs: config.puppeteer.args,
       logRetentionDays: config.db.retentionDays,
-    }, 'Startup configuration summary')
+    }, 'Service started')
   })
 }
 
