@@ -81,6 +81,14 @@ export function buildPosterHTML(data: PosterData): string {
   const cardsHTML = data.cards.map(generateCardHTML).join('')
   const interpretationHTML = generateInterpretationHTML(data)
 
+  // 根据 question 是否存在动态生成问题区域 HTML
+  const questionHTML = data.question
+    ? `<div class="question-section">
+       <div class="question-label">🔮 你的问题</div>
+       <div class="question-text">${escapeHTML(data.question)}</div>
+     </div>`
+    : ''
+
   // 如果没有指定 theme，使用模板默认主题
   const theme = getTheme(data.theme || template.defaultTheme)
   const themeCSSVars = themeToCSSVars(theme)
@@ -88,7 +96,7 @@ export function buildPosterHTML(data: PosterData): string {
   return renderTemplate(template.html, template.css, {
     spreadName: data.spreadName,
     date: data.date,
-    question: data.question,
+    questionHTML,
     cardsHTML,
     interpretationHTML,
   }, themeCSSVars)

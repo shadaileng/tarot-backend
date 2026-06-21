@@ -25,7 +25,7 @@ export type TemplateName = 'default' | 'minimal' | 'wechat'
 
 export interface PosterData {
   cards: PosterCardInput[]
-  question: string
+  question?: string
   spreadName: string
   interpretation?: string
   /** 综合解读文本（优先使用，由调用方提取/生成） */

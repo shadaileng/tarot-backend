@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-06-21
+
+### Added
+
+- 海报生成支持无问题模式：`question` 字段改为可选，不传时海报不显示问题区域
+
 ## [1.8.0] - 2026-06-21
 
 ### Added
