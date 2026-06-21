@@ -120,6 +120,7 @@ app.post('/poster', authMiddleware, async (req, res) => {
   const requestStart = Date.now()
   const posterData = req.body as PosterData
   const template = getTemplate(posterData.template)
+  const requestLogger = log.child({ logId: (req as any).logId || 'unknown' })
 
   try {
     if (!posterData.cards || !Array.isArray(posterData.cards) || posterData.cards.length === 0) {
@@ -131,7 +132,7 @@ app.post('/poster', authMiddleware, async (req, res) => {
     const cached = posterCache.get(cacheKey)
     if (cached) {
       const totalMs = Date.now() - requestStart
-      log.debug({ cacheKey, template: template.name, totalMs }, 'Poster cache HIT')
+      requestLogger.debug({ cacheKey, template: template.name, totalMs }, 'Poster cache HIT')
 
       res.set('Content-Type', 'image/png')
       res.set('X-Cache', 'HIT')
@@ -160,7 +161,7 @@ app.post('/poster', authMiddleware, async (req, res) => {
 
     const totalMs = Date.now() - requestStart
 
-    log.info({
+    requestLogger.info({
       cacheKey,
       template: template.name,
       templateMs,
@@ -189,7 +190,7 @@ app.post('/poster', authMiddleware, async (req, res) => {
     res.send(imageBuffer)
   } catch (error) {
     metrics.recordError()
-    log.error({ err: error }, 'Poster generation failed')
+    requestLogger.error({ err: error }, 'Poster generation failed')
     res.status(500).json({ error: 'Poster generation failed' })
   }
 })
@@ -267,12 +268,16 @@ app.put('/api/config/:key', authMiddleware, async (req, res) => {
 
   if (key === 'CACHE_MAX_SIZE' || key === 'CACHE_TTL_SECONDS') {
     posterCache.updateConfig(config.cache.maxSize, config.cache.ttlSeconds)
+    log.info({ key, cacheMaxSize: config.cache.maxSize, cacheTtlSeconds: config.cache.ttlSeconds }, 'Cache config applied')
   }
 
   if (key === 'POOL_MAX_PAGES' || key === 'POOL_ACQUIRE_TIMEOUT_MS') {
     const pool = await getPoolInstance()
     if (pool) {
       pool.updateConfig(config.pool.maxPages, config.pool.acquireTimeoutMs)
+      log.info({ key, poolMaxPages: config.pool.maxPages, poolAcquireTimeoutMs: config.pool.acquireTimeoutMs }, 'Pool config applied')
+    } else {
+      log.warn({ key }, 'Pool config updated but pool not yet initialized — will apply on next launch')
     }
   }
 
@@ -342,6 +347,22 @@ async function start(): Promise<void> {
       puppeteerArgs: config.puppeteer.args,
       logRetentionDays: config.db.retentionDays,
     }, 'Service started')
+
+    // 周期状态日志 — 每 60s 输出一条 metrics snapshot（健康自检）
+    const statusInterval = setInterval(() => {
+      const snap = metrics.getSnapshot()
+      log.info({
+        totalRequests: snap.totalRequests,
+        errorCount: snap.errorCount,
+        errorRate: snap.totalRequests > 0
+          ? (snap.errorCount / snap.totalRequests * 100).toFixed(2) + '%'
+          : '0%',
+        avgTotalMs: Math.round(snap.avgTotalMs),
+        cacheHitRate: (snap.cacheHitRate * 100).toFixed(1) + '%',
+        sampleCount: snap.sampleCount,
+      }, 'Periodic status report')
+    }, 60000)
+    statusInterval.unref()
   })
 }
 

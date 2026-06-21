@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-06-21
+
+### Added
+
+- **请求 ID 透传**：`reading` 和 `poster` handler 使用 `log.child({ logId })` 串联下游日志，可通过 logId 追踪完整请求链路
+- **周期状态日志**：每 60 秒输出一条 metrics snapshot（请求量、错误率、平均耗时、缓存命中率），实现无额外工具的轻量健康自检
+- **配置热更新通知**：通过 API 更新 cache/pool 配置后，输出已生效的详细参数；pool 未初始化时输出 warn 提示
+
 ## [1.6.0] - 2026-06-21
 
 ### Added

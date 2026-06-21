@@ -7,8 +7,10 @@ import type { ReadingRequestBody } from './types.js'
 const log = getLogger('reading')
 
 export async function readingHandler(req: Request, res: Response): Promise<void> {
+  const requestLogger = log.child({ logId: (req as any).logId || 'unknown' })
+
   if (!config.geminiApiKey) {
-    log.warn('GEMINI_API_KEY not configured — reading endpoint unavailable')
+    requestLogger.warn('GEMINI_API_KEY not configured — reading endpoint unavailable')
     res.status(500).json({ error: 'GEMINI_API_KEY not configured' })
     return
   }
@@ -17,7 +19,7 @@ export async function readingHandler(req: Request, res: Response): Promise<void>
   const { question, cards } = body
 
   if (!question || !cards || cards.length === 0) {
-    log.warn({ hasQuestion: !!question, cardCount: cards?.length ?? 0 }, 'Invalid reading request: missing question or cards')
+    requestLogger.warn({ hasQuestion: !!question, cardCount: cards?.length ?? 0 }, 'Invalid reading request: missing question or cards')
     res.status(400).json({ error: 'Missing question or cards' })
     return
   }
@@ -27,7 +29,7 @@ export async function readingHandler(req: Request, res: Response): Promise<void>
 
     if (result.success) {
       if (result.incomplete) {
-        log.warn({ model: result.model, warning: result.warning }, 'Reading succeeded but incomplete')
+        requestLogger.warn({ model: result.model, warning: result.warning }, 'Reading succeeded but incomplete')
       }
       const responseBody: any = {
         reading: result.reading,
@@ -39,7 +41,7 @@ export async function readingHandler(req: Request, res: Response): Promise<void>
       }
       res.json(responseBody)
     } else {
-      log.warn({
+      requestLogger.warn({
         error: result.error,
         detail: result.detail?.slice(0, 200),
         model: result.model,
@@ -55,7 +57,7 @@ export async function readingHandler(req: Request, res: Response): Promise<void>
       })
     }
   } catch (error: any) {
-    log.error({ err: error, stack: error.stack }, 'Unhandled error in reading handler')
+    requestLogger.error({ err: error, stack: error.stack }, 'Unhandled error in reading handler')
     res.status(500).json({ error: error.message || 'Internal server error' })
   }
 }
