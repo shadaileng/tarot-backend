@@ -14,7 +14,7 @@ import { getTemplate } from './poster/templates/index.js'
 import { metrics } from './monitor/index.js'
 import { getLogger } from './logger.js'
 import { readingHandler } from './reading/handler.js'
-import { getCachedGeminiHealth, quotaExhaustedCache } from './reading/models.js'
+import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } from './reading/models.js'
 import { queryLogs, getLogById } from './db/reading-log.js'
 import { getAllConfig, upsertConfig, initDefaultConfig } from './db/config.js'
 import { getDb } from './db/index.js'
@@ -49,9 +49,10 @@ app.get('/', (_req, res) => {
   })
 })
 
-app.get('/health', async (_req, res) => {
+app.get('/health', async (req, res) => {
   const poolStats = await getPoolStats()
   const snap = metrics.getSnapshot()
+  const noCache = req.query.noCache === '1'
 
   // 默认状态：Worker 正常运行
   let geminiStatus: 'up' | 'down' | 'unconfigured' | 'quota_exhausted' = 'unconfigured'
@@ -64,7 +65,9 @@ app.get('/health', async (_req, res) => {
     geminiDetail = 'GEMINI_API_KEY not configured'
     httpStatus = 500
   } else {
-    const geminiHealth = await getCachedGeminiHealth(config.geminiApiKey)
+    const geminiHealth = noCache
+      ? await getGeminiHealthDirectly(config.geminiApiKey)
+      : await getCachedGeminiHealth(config.geminiApiKey)
 
     if (geminiHealth.allExhausted) {
       geminiStatus = 'quota_exhausted'
@@ -83,6 +86,7 @@ app.get('/health', async (_req, res) => {
     worker: 'up',
     gemini: geminiStatus,
     model: geminiModel,
+    _noCache: noCache || undefined,
     cache: {
       size: posterCache.size,
       maxSize: posterCache.maxSize,

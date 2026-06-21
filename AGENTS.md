@@ -216,6 +216,7 @@ interface ReadingRequestBody {
 | `cache` | object | 缓存统计（size/maxSize/hitRate） |
 | `pool` | object | 浏览器池状态（available/active/waiting/maxPages） |
 | `metrics` | object | 请求指标（totalRequests/errors/avgTotalMs） |
+| `_noCache` | `true` \| `undefined` | 是否跳过了缓存（仅 `?noCache=1` 时出现） |
 
 **状态说明**：
 
@@ -257,6 +258,22 @@ interface ReadingRequestBody {
 ```
 
 > **实现说明**：`gemini` 状态通过调用 `GET /v1beta/models` 验证（不消耗 token），结果缓存 5 分钟。`model` 字段由 `selectBestModel()` 从可用模型列表中动态选出，会跳过配额已耗尽的模型。
+
+### GET /health 缓存机制
+
+`/health` 端点的 Gemini 探测结果按 **apiKey 分桶缓存**（TTL 5 分钟），不同 Key 互不干扰。
+
+**`?noCache=1` 查询参数**：绕过缓存强制重新探测 Gemini API，结果写回缓存以续期 TTL。适用于：
+- 运行时修改了 `GEMINI_API_KEY`，需要立即验证新 Key
+- 排查 Gemini API 连通性问题
+- 强制刷新可用模型列表
+
+响应中会附加 `_noCache: true` 标记本次请求跳过了缓存。
+
+```bash
+# 强制刷新缓存（即时诊断）
+curl "http://localhost:3000/health?noCache=1"
+```
 
 ## 环境变量
 

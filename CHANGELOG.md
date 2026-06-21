@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-06-21
+
+### Added
+
+- `/health` 端点支持 `?noCache=1` 查询参数，绕过 Gemini 探测缓存，立即验证 API Key 连通性
+- Gemini 模型缓存按 `apiKey` 分桶存储（`Map<string, ModelCache>`），不同 Key 互不干扰
+- 新增 `getGeminiHealthDirectly()` 导出函数，强制重新探测并写回缓存
+- `/health` 响应体新增 `_noCache` 标记，仅在绕过缓存时返回 `true`
+
 ## [1.3.0] - 2026-06-21
 
 ### Changed

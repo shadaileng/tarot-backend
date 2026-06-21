@@ -12,7 +12,7 @@ const MODEL_PRIORITY = [
 
 const MODEL_CACHE_TTL = 5 * 60 * 1000
 
-let modelCache: ModelCache | null = null
+let modelCache = new Map<string, ModelCache>()
 let quotaExhaustedCache: QuotaExhaustedCache = {
   models: new Set(),
   date: '',
@@ -123,17 +123,19 @@ async function fetchAvailableModels(apiKey: string): Promise<{ up: boolean; deta
 
 async function getCachedModels(apiKey: string): Promise<ModelCache> {
   const now = Date.now()
-  if (modelCache && now - modelCache.timestamp < MODEL_CACHE_TTL) {
-    return modelCache
+  const cached = modelCache.get(apiKey)
+  if (cached && now - cached.timestamp < MODEL_CACHE_TTL) {
+    return cached
   }
   const result = await fetchAvailableModels(apiKey)
-  modelCache = {
+  const entry: ModelCache = {
     geminiUp: result.up,
     detail: result.detail,
     availableModels: result.models,
     timestamp: now,
   }
-  return modelCache
+  modelCache.set(apiKey, entry)
+  return entry
 }
 
 /**
@@ -287,6 +289,49 @@ export async function callGeminiReading(apiKey: string, question: string, cards:
     model: lastUsedModel,
     exhaustedModels: [...quotaExhaustedCache.models],
     lastGeminiStatus: lastErrorStatus,
+  }
+}
+
+/**
+ * 绕过缓存，直接探测 Gemini 健康状态（结果会写回缓存以续期 TTL）
+ * 适用于 ?noCache=1 等即时诊断场景
+ */
+export async function getGeminiHealthDirectly(apiKey: string): Promise<{
+  up: boolean
+  detail: string
+  model: string | null
+  allExhausted: boolean
+}> {
+  checkAndResetQuotaCache()
+  // 跳过缓存，强制重新探测并写回
+  const result = await fetchAvailableModels(apiKey)
+  const now = Date.now()
+  modelCache.set(apiKey, {
+    geminiUp: result.up,
+    detail: result.detail,
+    availableModels: result.models,
+    timestamp: now,
+  })
+
+  if (!result.up) {
+    return { up: false, detail: result.detail, model: null, allExhausted: false }
+  }
+
+  const ordered = getAvailableModelsOrdered(result.models)
+  if (ordered.length === 0) {
+    return {
+      up: true,
+      detail: 'All models quota exhausted for today',
+      model: null,
+      allExhausted: true,
+    }
+  }
+
+  return {
+    up: true,
+    detail: result.detail,
+    model: ordered[0],
+    allExhausted: false,
   }
 }
 

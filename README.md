@@ -210,6 +210,8 @@ curl "http://localhost:3000/logs/<log-id>"
 
 返回 Worker、Gemini API、缓存、浏览器池、请求指标的综合健康状态。
 
+支持 `?noCache=1` 查询参数绕过 Gemini 探测缓存（适用于切换 API Key 后即时验证）。
+
 **正常响应**（HTTP 200）：
 
 ```json
@@ -235,6 +237,9 @@ curl "http://localhost:3000/logs/<log-id>"
 
 ```bash
 curl http://localhost:3000/health
+
+# 切换 GEMINI_API_KEY 后强制刷新缓存验证
+curl "http://localhost:3000/health?noCache=1"
 ```
 
 ## 环境变量
