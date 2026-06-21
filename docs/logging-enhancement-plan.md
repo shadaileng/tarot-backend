@@ -24,11 +24,11 @@
 
 | # | 任务 | 文件 | 状态 |
 |---|------|------|------|
-| 1.1 | **访问日志** — 每个 HTTP 请求结束时输出 `log.info`，含 method/path/status/duration/ip/logId | `src/gateway/logging.ts` | ⬜ 待完成 |
-| 1.2 | **业务失败日志** — `/reading` handler 中 Gemini 失败时输出 `log.warn`/`log.error`，含 model/status/error/detail | `src/reading/handler.ts` | ⬜ 待完成 |
-| 1.3 | **Gemini 模型切换日志** — `callGeminiReading` 中每个模型重试时输出 `log.warn`，含 model/status/原因 | `src/reading/models.ts` | ⬜ 待完成 |
-| 1.4 | **缓存命中日志** — `X-Cache: HIT` 时输出 `log.debug`，`MISS` 时输出 `log.info`（含渲染耗时） | `src/index.ts`（poster handler） | ⬜ 待完成 |
-| 1.5 | **启动横幅增强** — 列出当前生效的关键配置（敏感信息脱敏），让运维一眼看清运行状态 | `src/index.ts` `start()` | ⬜ 待完成 |
+| 1.1 | **访问日志** — 每个 HTTP 请求结束时输出 `log.info`，含 method/path/status/duration/ip/logId | `src/gateway/logging.ts` | ✅ 已完成 |
+| 1.2 | **业务失败日志** — `/reading` handler 中 Gemini 失败时输出 `log.warn`/`log.error`，含 model/status/error/detail | `src/reading/handler.ts` | ✅ 已完成 |
+| 1.3 | **Gemini 模型切换日志** — `callGeminiReading` 中每个模型重试时输出 `log.warn`，含 model/status/原因 | `src/reading/models.ts` | ✅ 已完成 |
+| 1.4 | **缓存命中日志** — `X-Cache: HIT` 时输出 `log.debug`，`MISS` 时输出 `log.info`（含渲染耗时） | `src/index.ts`（poster handler） | ✅ 已完成 |
+| 1.5 | **启动横幅增强** — 列出当前生效的关键配置（敏感信息脱敏），让运维一眼看清运行状态 | `src/index.ts` `start()` | ✅ 已完成 |
 
 ### 详细实现要点
 
@@ -280,8 +280,8 @@ if (key === 'POOL_MAX_PAGES' || key === 'POOL_ACQUIRE_TIMEOUT_MS') {
 
 | 阶段 | 完成度 | 状态 |
 |------|--------|------|
-| 阶段 1 (P0) | 0% | ⬜ 待开始 |
+| 阶段 1 (P0) | 100% | ✅ 已完成 |
 | 阶段 2 (P1) | 0% | ⬜ 待开始 |
 | 阶段 3 (P2) | 0% | ⬜ 待开始 |
 | 阶段 4 (验证) | 0% | ⬜ 待开始 |
-| **总计** | **0%** | |
+| **总计** | **25%** | |
