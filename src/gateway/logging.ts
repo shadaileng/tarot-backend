@@ -17,6 +17,10 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
   const logId = crypto.randomUUID()
   const requestBody = req.body || {}
   const target = req.path === '/reading' ? 'reading' : req.path === '/poster' ? 'poster' : 'other'
+  const ip = req.ip || req.socket.remoteAddress || ''
+
+  // 将 logId 注入到 req，供下游 handler 串联日志
+  ;(req as any).logId = logId
 
   let logWritten = false
 
@@ -33,6 +37,30 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
       ? (respObj.error || respObj.detail || null)
       : null
 
+    // 访问日志 — 每个请求结束输出一条
+    if (isError) {
+      log.warn({
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        duration,
+        ip,
+        logId,
+        target,
+        error: errorMsg,
+      }, `${req.method} ${req.path} ${res.statusCode} ${duration}ms (error)`)
+    } else {
+      log.info({
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        duration,
+        ip,
+        logId,
+        target,
+      }, `${req.method} ${req.path} ${res.statusCode} ${duration}ms`)
+    }
+
     insertLog({
       id: logId,
       method: req.method,
@@ -40,7 +68,7 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
       target,
       status_code: res.statusCode,
       duration_ms: duration,
-      ip_address: req.ip || req.socket.remoteAddress || '',
+      ip_address: ip,
       question: requestBody.question || null,
       cards_json: requestBody.cards ? JSON.stringify(requestBody.cards) : null,
       reading: target === 'reading' && respObj ? (respObj.reading || null) : null,

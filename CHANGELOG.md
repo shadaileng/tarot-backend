@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-06-21
+
+### Added
+
+- **访问日志**：每个 HTTP 请求结束时输出结构化日志，含 method/path/status/duration/ip/logId
+- **业务失败日志**：`/reading` handler 在 Gemini 调用失败、参数校验失败、未处理异常时输出 warn/error 日志
+- **Gemini 模型切换日志**：每次模型重试时输出 model/status/retryable，配额标记和全部耗尽时输出 error 日志
+- **缓存命中日志**：poster handler 在缓存 HIT 时输出 debug 日志、MISS 时输出 info 日志（含各阶段渲染耗时）
+- **启动横幅增强**：`start()` 输出完整配置摘要（端口、环境、时区、API Key 状态、缓存、连接池、Puppeteer 参数等），运维可一眼看清运行状态
+
 ## [1.4.1] - 2026-06-21
 
 ### Fixed

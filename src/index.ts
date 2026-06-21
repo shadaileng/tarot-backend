@@ -130,6 +130,9 @@ app.post('/poster', authMiddleware, async (req, res) => {
     const cacheKey = posterCache.generateKey(posterData)
     const cached = posterCache.get(cacheKey)
     if (cached) {
+      const totalMs = Date.now() - requestStart
+      log.debug({ cacheKey, template: template.name, totalMs }, 'Poster cache HIT')
+
       res.set('Content-Type', 'image/png')
       res.set('X-Cache', 'HIT')
       res.set('Cache-Control', 'public, max-age=3600')
@@ -139,7 +142,7 @@ app.post('/poster', authMiddleware, async (req, res) => {
         templateMs: 0,
         resourceMs: 0,
         screenshotMs: 0,
-        totalMs: Date.now() - requestStart,
+        totalMs,
         timestamp: requestStart,
         template: template.name,
         cacheHit: true,
@@ -156,6 +159,15 @@ app.post('/poster', authMiddleware, async (req, res) => {
     posterCache.set(cacheKey, imageBuffer)
 
     const totalMs = Date.now() - requestStart
+
+    log.info({
+      cacheKey,
+      template: template.name,
+      templateMs,
+      resourceMs: timings.resourceMs,
+      screenshotMs: timings.screenshotMs,
+      totalMs,
+    }, `Poster cache MISS — rendered in ${totalMs}ms`)
 
     metrics.recordRender({
       templateMs,
@@ -289,10 +301,23 @@ async function start(): Promise<void> {
   }
 
   app.listen(config.port, '0.0.0.0', () => {
-    log.info({ port: config.port }, 'Tarot Backend Service running')
-    log.info({ environment: config.nodeEnv }, 'Environment')
-    log.info({ geminiConfigured: !!config.geminiApiKey }, 'Gemini API')
-    log.info({ authEnabled: !!config.apiKey }, 'Auth status')
+    log.info({
+      port: config.port,
+      nodeEnv: config.nodeEnv,
+      timezone: config.timezone,
+      logLevel: process.env.LOG_LEVEL || (config.nodeEnv === 'development' ? 'debug' : 'info'),
+      geminiKey: config.geminiApiKey ? '***configured***' : 'NOT SET',
+      apiKey: config.apiKey ? '***configured***' : 'NOT SET',
+      corsOrigin: config.corsOrigin,
+      dbPath: config.db.path,
+      cacheMaxSize: config.cache.maxSize,
+      cacheTtlSeconds: config.cache.ttlSeconds,
+      poolMaxPages: config.pool.maxPages,
+      poolAcquireTimeoutMs: config.pool.acquireTimeoutMs,
+      puppeteerPath: config.puppeteer.executablePath || '(system default)',
+      puppeteerArgs: config.puppeteer.args,
+      logRetentionDays: config.db.retentionDays,
+    }, 'Startup configuration summary')
   })
 }
 

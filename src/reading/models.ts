@@ -1,5 +1,8 @@
 import type { ModelCache, QuotaExhaustedCache } from './types.js'
 import { systemPrompt, buildUserPrompt } from './prompt.js'
+import { getLogger } from '../logger.js'
+
+const log = getLogger('gemini')
 
 const MODEL_PRIORITY = [
   'gemini-2.5-flash-lite',
@@ -28,6 +31,7 @@ function checkAndResetQuotaCache(): void {
 function markModelQuotaExhausted(modelName: string): void {
   checkAndResetQuotaCache()
   quotaExhaustedCache.models.add(modelName)
+  log.warn({ model: modelName, exhaustedCount: quotaExhaustedCache.models.size }, 'Model marked as quota exhausted')
 }
 
 function getAvailableModelsOrdered(availableModelNames: string[]): string[] {
@@ -206,6 +210,7 @@ export async function callGeminiReading(apiKey: string, question: string, cards:
 
   const modelsToTry = getAvailableModelsOrdered(cache.availableModels)
   if (modelsToTry.length === 0) {
+    log.error({ exhaustedModels: [...quotaExhaustedCache.models] }, 'All Gemini models quota exhausted for today')
     return {
       success: false,
       status: 429,
@@ -251,6 +256,8 @@ export async function callGeminiReading(apiKey: string, question: string, cards:
       const hasSummary = /✨\s*\*{0,2}综合解读/.test(reading)
       const incomplete = truncated || !hasSummary
 
+      log.info({ model, finishReason, incomplete, readingLength: reading.length }, 'Gemini reading generated successfully')
+
       const result: ReadingResult = {
         success: true,
         reading,
@@ -271,7 +278,15 @@ export async function callGeminiReading(apiKey: string, question: string, cards:
     lastErrorText = errorText
     lastUsedModel = model
 
-    if (isRetryableError(geminiResponse.status, errorText)) {
+    const retryable = isRetryableError(geminiResponse.status, errorText)
+    log.warn({
+      model,
+      status: geminiResponse.status,
+      retryable,
+      errorPreview: errorText.slice(0, 200),
+    }, `Gemini model '${model}' returned ${geminiResponse.status}${retryable ? ' (will retry)' : ' (fatal)'}`)
+
+    if (retryable) {
       if (shouldMarkQuotaExhausted(geminiResponse.status)) {
         markModelQuotaExhausted(model)
       }
@@ -281,13 +296,21 @@ export async function callGeminiReading(apiKey: string, question: string, cards:
     break
   }
 
+  const exhaustedList = [...quotaExhaustedCache.models]
+  log.error({
+    lastModel: lastUsedModel,
+    lastStatus: lastErrorStatus,
+    exhaustedModels: exhaustedList,
+    triedCount: modelsToTry.length,
+  }, 'All Gemini models failed — giving up')
+
   return {
     success: false,
     status: 502,
     error: 'AI service error',
     detail: lastErrorText.slice(0, 500),
     model: lastUsedModel,
-    exhaustedModels: [...quotaExhaustedCache.models],
+    exhaustedModels: exhaustedList,
     lastGeminiStatus: lastErrorStatus,
   }
 }
