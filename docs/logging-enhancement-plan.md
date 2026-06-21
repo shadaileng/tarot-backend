@@ -112,11 +112,11 @@ log.info({
 
 | # | 任务 | 文件 | 状态 |
 |---|------|------|------|
-| 2.1 | **优雅关闭日志** — SIGTERM/SIGINT 监听时输出 `log.info` | `src/index.ts` | ⬜ 待完成 |
-| 2.2 | **DB 模块日志** — `getDb` 成功后输出 `log.info`，含路径、是否新建、schema 初始化 | `src/db/index.ts` | ⬜ 待完成 |
-| 2.3 | **配置加载来源日志** — 启动时区分 "from env" vs "default value" vs "from DB user" | `src/index.ts` `start()` | ⬜ 待完成 |
-| 2.4 | **Puppeteer 启动详情** — 启动后输出 `log.info` 含 executablePath、args、耗时 | `src/poster/render.ts` `getBrowser()` | ⬜ 待完成 |
-| 2.5 | **Gemini 健康探测日志** — `fetchAvailableModels` 失败/成功时输出 `log.warn`/`log.info` | `src/reading/models.ts` | ⬜ 待完成 |
+| 2.1 | **优雅关闭日志** — SIGTERM/SIGINT 监听时输出 `log.info` | `src/index.ts` | ✅ 已完成 |
+| 2.2 | **DB 模块日志** — `getDb` 成功后输出 `log.info`，含路径、是否新建、schema 初始化 | `src/db/index.ts` | ✅ 已完成 |
+| 2.3 | **配置加载来源日志** — 启动时区分 "from env" vs "default value" vs "from DB user" | `src/index.ts` `start()` | ✅ 已完成 |
+| 2.4 | **Puppeteer 启动详情** — 启动后输出 `log.info` 含 executablePath、args、耗时 | `src/poster/render.ts` `getBrowser()` | ✅ 已完成 |
+| 2.5 | **Gemini 健康探测日志** — `fetchAvailableModels` 失败/成功时输出 `log.warn`/`log.info` | `src/reading/models.ts` | ✅ 已完成 |
 
 ### 详细实现要点
 
@@ -281,7 +281,7 @@ if (key === 'POOL_MAX_PAGES' || key === 'POOL_ACQUIRE_TIMEOUT_MS') {
 | 阶段 | 完成度 | 状态 |
 |------|--------|------|
 | 阶段 1 (P0) | 100% | ✅ 已完成 |
-| 阶段 2 (P1) | 0% | ⬜ 待开始 |
+| 阶段 2 (P1) | 100% | ✅ 已完成 |
 | 阶段 3 (P2) | 0% | ⬜ 待开始 |
 | 阶段 4 (验证) | 0% | ⬜ 待开始 |
-| **总计** | **25%** | |
+| **总计** | **50%** | |
