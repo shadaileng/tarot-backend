@@ -194,7 +194,7 @@ export interface ReadingResult {
   lastGeminiStatus?: number
 }
 
-export async function callGeminiReading(apiKey: string, question: string, cards: any[]): Promise<ReadingResult> {
+export async function callGeminiReading(apiKey: string, question: string | undefined, cards: any[]): Promise<ReadingResult> {
   const cardsInfo = cards
     .map(
       (c: any) =>
@@ -204,7 +204,7 @@ export async function callGeminiReading(apiKey: string, question: string, cards:
     )
     .join('\n\n')
 
-  const userPrompt = buildUserPrompt(question, cardsInfo)
+  const userPrompt = buildUserPrompt(question || '', cardsInfo)
 
   const cache = await getCachedModels(apiKey)
   if (!cache.geminiUp || cache.availableModels.length === 0) {

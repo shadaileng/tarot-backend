@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-06-21
+
+### Added
+
+- `/reading` 接口 `question` 参数改为可选，支持不传问题直接进行通用卡牌解读
+- 提示词根据是否有问题动态调整：有问题时进行个性化解读，无问题时进行通用牌面解读
+
 ## [1.7.1] - 2026-06-21
 
 ### Fixed

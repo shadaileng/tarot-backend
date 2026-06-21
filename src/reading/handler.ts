@@ -18,9 +18,9 @@ export async function readingHandler(req: Request, res: Response): Promise<void>
   const body = req.body as ReadingRequestBody
   const { question, cards } = body
 
-  if (!question || !cards || cards.length === 0) {
-    requestLogger.warn({ hasQuestion: !!question, cardCount: cards?.length ?? 0 }, 'Invalid reading request: missing question or cards')
-    res.status(400).json({ error: 'Missing question or cards' })
+  if (!cards || cards.length === 0) {
+    requestLogger.warn({ cardCount: cards?.length ?? 0 }, 'Invalid reading request: missing cards')
+    res.status(400).json({ error: 'Missing cards' })
     return
   }
 

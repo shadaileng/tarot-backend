@@ -8,7 +8,7 @@ export interface CardInput {
 }
 
 export interface ReadingRequestBody {
-  question: string
+  question?: string
   cards: CardInput[]
 }
 
