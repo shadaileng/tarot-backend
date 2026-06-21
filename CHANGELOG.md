@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-06-21
+
+### Changed
+
+- `/health` 端点升级为分层健康检查：实际调用 Gemini API（`GET /v1beta/models`）验证可用性，新增 `model` 字段返回当前选中的 Gemini 模型名
+- `gemini` 字段从二值（`up`/`unconfigured`）扩展为四值（`up`/`down`/`quota_exhausted`/`unconfigured`），更准确反映大模型真实状态
+- 当 API Key 未配置时返回 HTTP 500，便于负载均衡器识别异常实例
+
 ## [1.1.3] - 2026-06-18
 
 ### Fixed

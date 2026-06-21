@@ -208,18 +208,33 @@ curl "http://localhost:3000/logs/<log-id>"
 
 ### GET /health — 健康检查
 
+返回 Worker、Gemini API、缓存、浏览器池、请求指标的综合健康状态。
+
+**正常响应**（HTTP 200）：
+
 ```json
 {
   "status": "ok",
-  "gemini": "configured",
+  "worker": "up",
+  "gemini": "up",
+  "model": "gemini-2.5-flash-lite",
   "cache": { "size": 5, "maxSize": 100, "hitRate": 0.3 },
   "pool": { "available": 4, "active": 0, "waiting": 0, "maxPages": 4 },
-  "metrics": {
-    "totalRequests": 42,
-    "errors": 1,
-    "avgTotalMs": 3120
-  }
+  "metrics": { "totalRequests": 42, "errors": 1, "avgTotalMs": 3120 }
 }
+```
+
+**Gemini 状态说明**：
+
+- `up` — Gemini API 可用，返回当前选中的模型名
+- `quota_exhausted` — 所有模型今日配额已耗尽（HTTP 200，`exhaustedModels` 列出已耗尽模型）
+- `down` — API Key 无效或网络不可达（HTTP 200，`detail` 说明原因）
+- `unconfigured` — 未配置 `GEMINI_API_KEY`（HTTP 500）
+
+**示例**：
+
+```bash
+curl http://localhost:3000/health
 ```
 
 ## 环境变量
@@ -341,7 +356,7 @@ curl http://localhost:3000/
 
 # 2. 健康检查
 curl http://localhost:3000/health
-# 期望：{"status":"ok","gemini":"configured",...}
+# 期望：{"status":"ok","worker":"up","gemini":"up","model":"...",...}
 
 # 3. 参数校验
 curl -s -X POST http://localhost:3000/reading \

@@ -136,6 +136,42 @@ async function getCachedModels(apiKey: string): Promise<ModelCache> {
   return modelCache
 }
 
+/**
+ * 获取 Gemini 健康状态（带缓存），同时返回当前选中的模型名
+ * 当所有模型配额耗尽时，返回 allExhausted: true
+ */
+export async function getCachedGeminiHealth(apiKey: string): Promise<{
+  up: boolean
+  detail: string
+  model: string | null
+  allExhausted: boolean
+}> {
+  checkAndResetQuotaCache()
+  const cache = await getCachedModels(apiKey)
+
+  if (!cache.geminiUp) {
+    return { up: false, detail: cache.detail, model: null, allExhausted: false }
+  }
+
+  const ordered = getAvailableModelsOrdered(cache.availableModels)
+  if (ordered.length === 0) {
+    // 有可用模型但全部被标记为配额耗尽
+    return {
+      up: true,
+      detail: 'All models quota exhausted for today',
+      model: null,
+      allExhausted: true,
+    }
+  }
+
+  return {
+    up: true,
+    detail: cache.detail,
+    model: ordered[0],
+    allExhausted: false,
+  }
+}
+
 export interface ReadingResult {
   success: boolean
   reading?: string

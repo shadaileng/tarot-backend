@@ -201,9 +201,62 @@ interface ReadingRequestBody {
 
 查询参数：`page`（默认 1）、`limit`（默认 50，最大 200）、`target`（`reading` / `poster`）。
 
-### GET /health
+### GET /health — 健康检查
 
-返回 Gemini API 配置状态、缓存统计、浏览器池状态、请求指标。
+**响应字段**：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `status` | `ok` \| `degraded` | 整体健康状态 |
+| `worker` | `up` | Worker 进程状态（始终为 up） |
+| `gemini` | `up` \| `down` \| `quota_exhausted` \| `unconfigured` | Gemini API 状态 |
+| `model` | `string \| null` | 当前选中的 Gemini 模型名（如 `gemini-2.5-flash-lite`），不可用时为 `null` |
+| `detail` | `string?` | 错误详情（仅在异常时返回） |
+| `exhaustedModels` | `string[]?` | 今日已耗尽配额的模型列表（仅 quota_exhausted 时返回） |
+| `cache` | object | 缓存统计（size/maxSize/hitRate） |
+| `pool` | object | 浏览器池状态（available/active/waiting/maxPages） |
+| `metrics` | object | 请求指标（totalRequests/errors/avgTotalMs） |
+
+**状态说明**：
+
+| gemini 状态 | HTTP 状态码 | 含义 |
+|-------------|------------|------|
+| `up` | 200 | Gemini API 可用，有可用模型 |
+| `quota_exhausted` | 200 | API 可用，但今日所有模型配额已耗尽 |
+| `down` | 200 | API Key 无效、网络不可达或服务不可用 |
+| `unconfigured` | 500 | 未配置 `GEMINI_API_KEY` |
+
+**示例响应**（正常）：
+
+```json
+{
+  "status": "ok",
+  "worker": "up",
+  "gemini": "up",
+  "model": "gemini-2.5-flash-lite",
+  "cache": { "size": 5, "maxSize": 100, "hitRate": 0.3 },
+  "pool": { "available": 4, "active": 0, "waiting": 0, "maxPages": 4 },
+  "metrics": { "totalRequests": 42, "errors": 1, "avgTotalMs": 3120 }
+}
+```
+
+**示例响应**（配额耗尽）：
+
+```json
+{
+  "status": "degraded",
+  "worker": "up",
+  "gemini": "quota_exhausted",
+  "model": null,
+  "detail": "All models quota exhausted for today",
+  "exhaustedModels": ["gemini-2.5-flash-lite", "gemini-2.5-flash"],
+  "cache": { "size": 5, "maxSize": 100, "hitRate": 0.3 },
+  "pool": { "available": 4, "active": 0, "waiting": 0, "maxPages": 4 },
+  "metrics": { "totalRequests": 42, "errors": 1, "avgTotalMs": 3120 }
+}
+```
+
+> **实现说明**：`gemini` 状态通过调用 `GET /v1beta/models` 验证（不消耗 token），结果缓存 5 分钟。`model` 字段由 `selectBestModel()` 从可用模型列表中动态选出，会跳过配额已耗尽的模型。
 
 ## 环境变量
 
