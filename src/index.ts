@@ -293,7 +293,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 async function start(): Promise<void> {
   await getDb()
-  log.info({ path: config.db.path }, 'Database initialized')
+  // DB 初始化日志由 src/db/index.ts 的 getDb() 内部输出（含 path + new 标记）
 
   const defaults = getConfigDefaults()
   await initDefaultConfig(defaults)

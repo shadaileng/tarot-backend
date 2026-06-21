@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1] - 2026-06-21
+
+### Fixed
+
+- 消除 `start()` 中冗余的 DB 初始化日志（DB 模块内部已输出 path + new 标记）
+
 ## [1.7.0] - 2026-06-21
 
 ### Added
