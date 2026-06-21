@@ -51,3 +51,23 @@ export async function initDefaultConfig(defaults: Record<string, string>): Promi
     }
   }
 }
+
+/**
+ * 从数据库加载所有 source='user' 的配置项，回写到 process.env 和内存 config 对象。
+ * 用于服务启动时恢复用户通过 PUT /api/config/:key 动态设置的配置。
+ *
+ * 优先级：DB user 配置 > 环境变量（DB 优先）
+ */
+export async function loadUserConfig(): Promise<string[]> {
+  const { updateConfig } = await import('../config.js')
+  const db = await getAllConfig()
+  const loadedKeys: string[] = []
+  for (const [key, entry] of db) {
+    if (entry.source === 'user') {
+      process.env[key] = entry.value
+      updateConfig(key, entry.value)
+      loadedKeys.push(key)
+    }
+  }
+  return loadedKeys
+}

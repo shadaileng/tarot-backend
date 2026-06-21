@@ -16,7 +16,7 @@ import { getLogger } from './logger.js'
 import { readingHandler } from './reading/handler.js'
 import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } from './reading/models.js'
 import { queryLogs, getLogById } from './db/reading-log.js'
-import { getAllConfig, upsertConfig, initDefaultConfig } from './db/config.js'
+import { getAllConfig, upsertConfig, initDefaultConfig, loadUserConfig } from './db/config.js'
 import { getDb } from './db/index.js'
 import type { PosterData } from './poster/types.js'
 
@@ -281,6 +281,12 @@ async function start(): Promise<void> {
   const defaults = getConfigDefaults()
   await initDefaultConfig(defaults)
   log.info('Default config initialized')
+
+  // 启动时从 DB 恢复用户动态配置（DB 优先于 env）
+  const restored = await loadUserConfig()
+  if (restored.length > 0) {
+    log.info({ restored }, 'Restored user config from database')
+  }
 
   app.listen(config.port, '0.0.0.0', () => {
     log.info({ port: config.port }, 'Tarot Backend Service running')

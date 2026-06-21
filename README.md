@@ -263,6 +263,16 @@ curl "http://localhost:3000/health?noCache=1"
 > `GEMINI_API_KEY` 是唯一必填变量，其余均有合理默认值。
 > Docker 部署时 `PUPPETEER_EXECUTABLE_PATH` 和 `PUPPETEER_ARGS` 已在 Dockerfile 中硬编码。
 
+### 配置持久化
+
+通过 `PUT /api/config/:key` 动态修改的配置会写入 SQLite `system_config` 表，标记为 `source='user'`。
+
+服务启动时自动从数据库恢复 `source='user'` 的配置项，**DB 中的 user 配置优先级高于环境变量**。
+
+适用场景：
+- 部署时未设置 `GEMINI_API_KEY` 环境变量
+- 运行时通过 API 动态注入 Key，重启后自动恢复，无需重新配置
+
 ## 数据库
 
 使用 SQLite（通过 `sql.js` WASM 实现，零编译依赖）。

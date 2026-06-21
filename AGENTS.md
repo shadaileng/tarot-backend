@@ -337,6 +337,36 @@ CREATE TABLE reading_logs (
 );
 ```
 
+## 配置持久化
+
+`PUT /api/config/:key` 写入的 `source='user'` 配置会持久化到 `system_config` 表。
+
+### 启动时恢复机制
+
+`start()` 流程在 `initDefaultConfig()` 之后、`app.listen()` 之前调用 `loadUserConfig()`：
+
+1. 遍历 `system_config` 表中所有 `source='user'` 的记录
+2. 回写到 `process.env` 和内存 `config` 对象
+3. 后续请求（`/health`、`/reading`、`/poster` 等）自然读到恢复后的值
+
+### 优先级规则
+
+**DB user 配置 > 环境变量**（DB 优先）
+
+| 场景 | env | DB user | 启动后 config |
+|------|:---:|:---:|------|
+| 首次启动，env 已设 Key | `AIza...` | — | env 的值 |
+| 首次启动，env 未设 Key | 空 | — | 空（unconfigured） |
+| 动态配置 Key 后 | 空 | `AIza...` | user 的值 |
+| 重启后 | 空 | `AIza...` | user 的值（从 DB 恢复） |
+| 动态清空 Key 后 | 空 | `""` | 空（unconfigured） |
+
+### 适用场景
+
+- 部署时未设置 `GEMINI_API_KEY` 环境变量
+- 运行时通过 `PUT /api/config/GEMINI_API_KEY` 动态注入 Key
+- 服务重启后无需重新配置，Key 自动恢复
+
 ## 编码规范
 
 1. **TypeScript strict 模式** — 所有类型需明确声明，禁止隐式 `any`
