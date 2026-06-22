@@ -26,7 +26,7 @@ import { emailLoginHandler } from './auth/email-login.js'
 import { bindEmailHandler } from './auth/bind-email.js'
 import { bindPhoneHandler } from './auth/bind-phone.js'
 import { updateProfileHandler } from './auth/update-profile.js'
-import { getUserRecords, getRecordById, deleteRecord } from './db/reading-record.js'
+import { getUserRecords, getRecordById, saveRecord, deleteRecord } from './db/reading-record.js'
 import type { PosterData } from './poster/types.js'
 
 const log = getLogger('API')
@@ -251,6 +251,37 @@ app.get('/logs/:id', async (req, res) => {
 })
 
 // ========== 用户级占卜记录（JWT 鉴权）==========
+
+app.post('/user/records', jwtAuthMiddleware, async (req, res) => {
+  const { spreadType, question, cardsJson, reading, model, isLocal } = req.body as {
+    spreadType: string
+    question?: string
+    cardsJson: string
+    reading: string
+    model?: string
+    isLocal?: boolean
+  }
+
+  if (!spreadType || !cardsJson) {
+    res.status(400).json({ error: 'INVALID_INPUT', message: 'spreadType 和 cardsJson 为必填项' })
+    return
+  }
+
+  try {
+    const record = await saveRecord({
+      userId: req.userId!,
+      spreadType,
+      question: question || null,
+      cardsJson,
+      reading: reading || '',
+      model: model || null,
+      isLocal,
+    })
+    res.status(201).json(record)
+  } catch (err) {
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '保存记录失败' })
+  }
+})
 
 app.get('/user/records', jwtAuthMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1
