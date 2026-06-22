@@ -26,6 +26,10 @@ export const configMeta: ConfigMeta[] = [
   { key: 'POOL_ACQUIRE_TIMEOUT_MS', envKey: 'POOL_ACQUIRE_TIMEOUT_MS', group: '性能配置', editable: true, type: 'number', defaultValue: '30000' },
 
   { key: 'LOG_RETENTION_DAYS', envKey: 'LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '30' },
+
+  { key: 'WECHAT_APPID',  envKey: 'WECHAT_APPID',  group: '微信配置', editable: false, sensitive: false, type: 'string', defaultValue: '' },
+  { key: 'WECHAT_SECRET', envKey: 'WECHAT_SECRET', group: '微信配置', editable: false, sensitive: true,  type: 'string', defaultValue: '' },
+  { key: 'JWT_SECRET',    envKey: 'JWT_SECRET',    group: '安全配置', editable: false, sensitive: true,  type: 'string', defaultValue: '' },
 ]
 
 export const config = {
@@ -35,6 +39,10 @@ export const config = {
   timezone: process.env.TZ || 'Asia/Shanghai',
 
   apiKey: process.env.API_KEY || '',
+
+  wechatAppId: process.env.WECHAT_APPID || '',
+  wechatSecret: process.env.WECHAT_SECRET || '',
+  jwtSecret: process.env.JWT_SECRET || '',
 
   corsOrigin: process.env.CORS_ORIGIN || '*',
 
@@ -84,6 +92,15 @@ export function updateConfig(key: string, value: string): void {
       break
     case 'API_KEY':
       config.apiKey = value
+      break
+    case 'WECHAT_APPID':
+      config.wechatAppId = value
+      break
+    case 'WECHAT_SECRET':
+      config.wechatSecret = value
+      break
+    case 'JWT_SECRET':
+      config.jwtSecret = value
       break
     case 'CORS_ORIGIN':
       config.corsOrigin = value

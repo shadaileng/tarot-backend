@@ -61,7 +61,8 @@ function initSchema(database: Database): void {
       model          TEXT,
       incomplete     INTEGER DEFAULT 0,
       is_error       INTEGER DEFAULT 0,
-      error_msg      TEXT
+      error_msg      TEXT,
+      openid         TEXT
     )
   `)
   database.run('CREATE INDEX IF NOT EXISTS idx_logs_created_at ON reading_logs(created_at DESC)')
@@ -75,6 +76,43 @@ function initSchema(database: Database): void {
       updated_at  TEXT NOT NULL
     )
   `)
+
+  // ========== 用户系统表 ==========
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS users (
+      id            TEXT PRIMARY KEY,
+      openid        TEXT NOT NULL DEFAULT '',
+      unionid       TEXT,
+      email         TEXT,
+      password_hash TEXT,
+      phone         TEXT,
+      nickname      TEXT DEFAULT '匿名用户',
+      avatar_url    TEXT,
+      created_at    TEXT NOT NULL,
+      last_login_at TEXT NOT NULL
+    )
+  `)
+  database.run('CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_users_unionid ON users(unionid)')
+  database.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL AND email != \'\'')
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS reading_records (
+      id          TEXT PRIMARY KEY,
+      user_id     TEXT NOT NULL,
+      created_at  TEXT NOT NULL,
+      spread_type TEXT NOT NULL,
+      question    TEXT,
+      cards_json  TEXT NOT NULL,
+      reading     TEXT NOT NULL,
+      model       TEXT,
+      is_local    INTEGER DEFAULT 0,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `)
+  database.run('CREATE INDEX IF NOT EXISTS idx_records_user_id ON reading_records(user_id)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_records_created_at ON reading_records(created_at DESC)')
 }
 
 export function closeDb(): void {

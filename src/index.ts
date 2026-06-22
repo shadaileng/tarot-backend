@@ -5,6 +5,8 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import { config, configMeta, updateConfig, maskSensitiveValue, getConfigDefaults } from './config.js'
 import { corsMiddleware } from './middleware/cors.js'
 import { authMiddleware } from './middleware/auth.js'
+import { jwtAuthMiddleware } from './middleware/jwt-auth.js'
+import { rateLimitMiddleware } from './middleware/rate-limit.js'
 import { loggingMiddleware } from './gateway/logging.js'
 import { buildPosterHTML } from './poster/template.js'
 import { renderPoster } from './poster/render.js'
@@ -18,6 +20,13 @@ import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } f
 import { queryLogs, getLogById } from './db/reading-log.js'
 import { getAllConfig, upsertConfig, initDefaultConfig, loadUserConfig } from './db/config.js'
 import { getDb } from './db/index.js'
+import { wechatLoginHandler } from './auth/wechat-login.js'
+import { emailRegisterHandler } from './auth/email-register.js'
+import { emailLoginHandler } from './auth/email-login.js'
+import { bindEmailHandler } from './auth/bind-email.js'
+import { bindPhoneHandler } from './auth/bind-phone.js'
+import { updateProfileHandler } from './auth/update-profile.js'
+import { getUserRecords, getRecordById, deleteRecord } from './db/reading-record.js'
 import type { PosterData } from './poster/types.js'
 
 const log = getLogger('API')
@@ -45,6 +54,19 @@ app.get('/', (_req, res) => {
       health: 'GET /health',
       metrics: 'GET /metrics',
       logs: 'GET /logs',
+      auth: {
+        wechatLogin: 'POST /auth/wechat-login',
+        emailRegister: 'POST /auth/email-register',
+        emailLogin: 'POST /auth/email-login',
+        bindEmail: 'POST /auth/bind-email',
+        bindPhone: 'POST /auth/bind-phone',
+      },
+      user: {
+        profile: 'PUT /user/profile',
+        records: 'GET /user/records',
+        recordById: 'GET /user/records/:id',
+        deleteRecord: 'DELETE /user/records/:id',
+      },
     },
   })
 })
@@ -114,9 +136,25 @@ app.get('/metrics', (_req, res) => {
   res.send(metrics.toPrometheus())
 })
 
-app.post('/reading', readingHandler)
+// ========== 认证相关路由 ==========
 
-app.post('/poster', authMiddleware, async (req, res) => {
+// 登录与注册（无需鉴权）
+app.post('/auth/wechat-login', wechatLoginHandler)
+app.post('/auth/email-register', emailRegisterHandler)
+app.post('/auth/email-login', emailLoginHandler)
+
+// 账号绑定（需要 JWT 鉴权）
+app.post('/auth/bind-email', jwtAuthMiddleware, bindEmailHandler)
+app.post('/auth/bind-phone', jwtAuthMiddleware, bindPhoneHandler)
+
+// 用户资料（需要 JWT 鉴权）
+app.put('/user/profile', jwtAuthMiddleware, updateProfileHandler)
+
+// ========== 业务接口（JWT 鉴权 + 频率限制）==========
+
+app.post('/reading', jwtAuthMiddleware, rateLimitMiddleware, readingHandler)
+
+app.post('/poster', jwtAuthMiddleware, async (req, res) => {
   const requestStart = Date.now()
   const posterData = req.body as PosterData
   const template = getTemplate(posterData.template)
@@ -210,6 +248,33 @@ app.get('/logs/:id', async (req, res) => {
     return
   }
   res.json(log)
+})
+
+// ========== 用户级占卜记录（JWT 鉴权）==========
+
+app.get('/user/records', jwtAuthMiddleware, async (req, res) => {
+  const page = parseInt(req.query.page as string) || 1
+  const limit = Math.min(parseInt(req.query.limit as string) || 20, 100)
+  const result = await getUserRecords(req.userId!, page, limit)
+  res.json(result)
+})
+
+app.get('/user/records/:id', jwtAuthMiddleware, async (req, res) => {
+  const record = await getRecordById(req.userId!, req.params.id)
+  if (!record) {
+    res.status(404).json({ error: 'Record not found' })
+    return
+  }
+  res.json(record)
+})
+
+app.delete('/user/records/:id', jwtAuthMiddleware, async (req, res) => {
+  const deleted = await deleteRecord(req.userId!, req.params.id)
+  if (!deleted) {
+    res.status(404).json({ error: 'Record not found' })
+    return
+  }
+  res.json({ message: '删除成功' })
 })
 
 app.get('/api/config', async (_req, res) => {
@@ -337,6 +402,9 @@ async function start(): Promise<void> {
       logLevel: process.env.LOG_LEVEL || (config.nodeEnv === 'development' ? 'debug' : 'info'),
       geminiKey: config.geminiApiKey ? '***configured***' : 'NOT SET',
       apiKey: config.apiKey ? '***configured***' : 'NOT SET',
+      wechatAppId: config.wechatAppId ? '***configured***' : 'NOT SET',
+      wechatSecret: config.wechatSecret ? '***configured***' : 'NOT SET',
+      jwtSecret: config.jwtSecret ? '***configured***' : 'NOT SET',
       corsOrigin: config.corsOrigin,
       restoredUserConfig: restored.length > 0 ? restored : undefined,
       cacheMaxSize: config.cache.maxSize,
