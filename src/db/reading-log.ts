@@ -20,8 +20,6 @@ export interface LogEntry {
 }
 
 export interface LogQueryResult {
-
-export interface LogQueryResult {
   total: number
   page: number
   limit: number
