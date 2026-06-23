@@ -13,6 +13,31 @@ const MODEL_PRIORITY = [
   'gemini-1.5-pro',
 ]
 
+// 不支持 generateContent 文本输出的模型黑名单关键字
+// -tts: 文本转语音（仅 AUDIO）
+// -image / imagen-: 图像生成（仅 IMAGE/IMAGE+TEXT）
+// embedding / text-embedding: 文本嵌入（仅 EMBEDDING）
+// learnlm / gemma-: 专用领域或纯语言模型
+const TEXT_MODEL_BLACKLIST_KEYWORDS = [
+  '-tts',
+  '-image',
+  '-image-generation',
+  'imagen-',
+  '-embedding',
+  'text-embedding',
+  'embedding-001',
+  'aqa',
+  'roboflow',
+  'robotics',
+  'learnlm',
+  'gemma-',
+]
+
+function isTextGenerationModel(modelName: string): boolean {
+  const lower = modelName.toLowerCase()
+  return !TEXT_MODEL_BLACKLIST_KEYWORDS.some((kw) => lower.includes(kw))
+}
+
 const MODEL_CACHE_TTL = 5 * 60 * 1000
 
 let modelCache = new Map<string, ModelCache>()
@@ -54,14 +79,15 @@ function getAvailableModelsOrdered(availableModelNames: string[]): string[] {
       !result.includes(m) &&
       !exhausted.has(m) &&
       m.includes('flash') &&
-      m.includes('gemini')
+      m.includes('gemini') &&
+      isTextGenerationModel(m)
     ) {
       result.push(m)
     }
   }
 
   for (const m of availableModelNames) {
-    if (!result.includes(m) && !exhausted.has(m) && m.includes('gemini')) {
+    if (!result.includes(m) && !exhausted.has(m) && m.includes('gemini') && isTextGenerationModel(m)) {
       result.push(m)
     }
   }
@@ -86,6 +112,18 @@ function isRetryableError(status: number, errorText: string): boolean {
       lower.includes('limit') ||
       lower.includes('exhausted') ||
       lower.includes('billing')
+    ) {
+      return true
+    }
+  }
+  // 模型本身不支持请求的功能（如 TTS 模型只支持 AUDIO，却被请求生成文本）
+  if (status === 400) {
+    const lower = errorText.toLowerCase()
+    if (
+      lower.includes('response_modalities') ||
+      lower.includes('response modalities') ||
+      lower.includes('invalid_argument') ||
+      lower.includes('not supported by the model')
     ) {
       return true
     }

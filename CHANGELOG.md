@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.2] - 2026-06-24
+
+### Fixed
+
+- 修复模型降级链选中 `gemini-2.5-flash-preview-tts`（仅支持 AUDIO 模态）导致解读请求返回 400 `INVALID_ARGUMENT` 的问题
+- 新增 `isTextGenerationModel` 黑名单过滤，排除 TTS / 图像生成 / 嵌入等非文本生成模型
+- `isRetryableError` 增加对 400 + `INVALID_ARGUMENT` / `response_modalities` 错误的识别，避免反复回退到不支持的模型
+
 ## [1.11.1] - 2026-06-24
 
 ### Fixed
