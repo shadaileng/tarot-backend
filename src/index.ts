@@ -158,7 +158,7 @@ app.post('/poster', jwtAuthMiddleware, async (req, res) => {
   const requestStart = Date.now()
   const posterData = req.body as PosterData
   const template = getTemplate(posterData.template)
-  const requestLogger = log.child({ logId: (req as any).logId || 'unknown' })
+  const requestLogger = log.child({ logId: (req as any).logId || 'unknown', userId: (req as any).userId || null })
 
   try {
     if (!posterData.cards || !Array.isArray(posterData.cards) || posterData.cards.length === 0) {

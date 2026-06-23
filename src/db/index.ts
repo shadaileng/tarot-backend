@@ -62,7 +62,8 @@ function initSchema(database: Database): void {
       incomplete     INTEGER DEFAULT 0,
       is_error       INTEGER DEFAULT 0,
       error_msg      TEXT,
-      openid         TEXT
+      openid         TEXT,
+      user_id        TEXT
     )
   `)
   database.run('CREATE INDEX IF NOT EXISTS idx_logs_created_at ON reading_logs(created_at DESC)')
@@ -113,6 +114,13 @@ function initSchema(database: Database): void {
   `)
   database.run('CREATE INDEX IF NOT EXISTS idx_records_user_id ON reading_records(user_id)')
   database.run('CREATE INDEX IF NOT EXISTS idx_records_created_at ON reading_records(created_at DESC)')
+
+  // 兼容已有数据库：为 reading_logs 新增 user_id 列
+  try {
+    database.run('ALTER TABLE reading_logs ADD COLUMN user_id TEXT')
+  } catch {
+    // 列已存在时静默忽略（SQLite 不支持 IF NOT EXISTS for ALTER TABLE）
+  }
 }
 
 export function closeDb(): void {

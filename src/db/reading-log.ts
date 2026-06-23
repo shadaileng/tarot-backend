@@ -16,7 +16,10 @@ export interface LogEntry {
   incomplete: number | null
   is_error: number | null
   error_msg: string | null
+  user_id: string | null
 }
+
+export interface LogQueryResult {
 
 export interface LogQueryResult {
   total: number
@@ -40,14 +43,15 @@ export interface InsertLogParams {
   incomplete?: boolean
   is_error?: boolean
   error_msg?: string | null
+  user_id?: string | null
 }
 
 export async function insertLog(params: InsertLogParams): Promise<void> {
   const db = await getDb()
   const created_at = new Date().toISOString()
   db.run(
-    `INSERT INTO reading_logs (id, created_at, method, path, target, status_code, duration_ms, ip_address, question, cards_json, reading, model, incomplete, is_error, error_msg)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO reading_logs (id, created_at, method, path, target, status_code, duration_ms, ip_address, question, cards_json, reading, model, incomplete, is_error, error_msg, user_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       params.id,
       created_at,
@@ -64,6 +68,7 @@ export async function insertLog(params: InsertLogParams): Promise<void> {
       params.incomplete ? 1 : 0,
       params.is_error ? 1 : 0,
       params.error_msg ?? null,
+      params.user_id ?? null,
     ],
   )
   saveDb()

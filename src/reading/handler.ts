@@ -7,7 +7,7 @@ import type { ReadingRequestBody } from './types.js'
 const log = getLogger('reading')
 
 export async function readingHandler(req: Request, res: Response): Promise<void> {
-  const requestLogger = log.child({ logId: (req as any).logId || 'unknown' })
+  const requestLogger = log.child({ logId: (req as any).logId || 'unknown', userId: (req as any).userId || null })
 
   if (!config.geminiApiKey) {
     requestLogger.warn('GEMINI_API_KEY not configured — reading endpoint unavailable')

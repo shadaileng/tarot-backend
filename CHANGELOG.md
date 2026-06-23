@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-06-24
+
+### Added
+
+- reading_logs 表新增 `user_id` 字段，配合已有 `openid` 实现双维度用户关联
+- loggingMiddleware 从 `req.userId` 提取用户标识并写入日志数据库
+- readingHandler、poster handler 的请求日志附加 `userId`，支持按用户追溯请求
+
 ## [1.9.0] - 2026-06-21
 
 ### Added

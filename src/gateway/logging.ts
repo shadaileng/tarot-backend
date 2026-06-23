@@ -28,6 +28,7 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
     if (logWritten || target === 'other') return
     logWritten = true
     const duration = Date.now() - start
+    const userId = (req as any).userId || null
     const isError = res.statusCode >= 400
     const respObj = body && typeof body === 'object' && !Buffer.isBuffer(body)
       ? body as Record<string, any>
@@ -76,6 +77,7 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
       incomplete: target === 'reading' && respObj ? !!(respObj.incomplete) : false,
       is_error: isError,
       error_msg: errorMsg,
+      user_id: userId,
     }).catch((err) => {
       log.error({ err, logId }, 'Failed to insert log')
     })
