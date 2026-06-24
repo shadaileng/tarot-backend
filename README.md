@@ -244,33 +244,33 @@ curl "http://localhost:3000/health?noCache=1"
 
 ## 环境变量
 
-| 变量 | 用途 | 默认值 | 必填 |
-|------|------|--------|:----:|
-| `PORT` | 服务端口 | `3000`（HF: `7860`） | |
-| `NODE_ENV` | 运行环境 | `development` | |
-| `TZ` | 时区 | `Asia/Shanghai` | |
-| `LOG_LEVEL` | 日志级别（trace/debug/info/warn/error/fatal） | `info` | |
-| `GEMINI_API_KEY` | Google Gemini API 密钥 | — | **✅** |
-| `API_KEY` | API 鉴权密钥（Bearer Token） | 空（不鉴权） | |
-| `CORS_ORIGIN` | 跨域允许来源 | `*` | |
-| `DB_PATH` | SQLite 数据库文件路径 | `./data/tarot.db` | |
-| `LOG_RETENTION_DAYS` | 日志保留天数 | `30` | |
-| `PUPPETEER_EXECUTABLE_PATH` | Chromium 可执行文件路径 | 系统自动查找 | |
-| `PUPPETEER_ARGS` | Chromium 启动参数 | `--no-sandbox,...` | |
-| `CACHE_MAX_SIZE` | LRU 缓存最大条目数 | `100` | |
-| `CACHE_TTL_SECONDS` | 缓存 TTL（秒） | `3600` | |
-| `POOL_MAX_PAGES` | 浏览器 Page 池大小 | `4` | |
-| `POOL_ACQUIRE_TIMEOUT_MS` | 获取 Page 超时（ms） | `30000` | |
-| `WECHAT_APPID` | 微信小程序 AppID | — | |
-| `WECHAT_SECRET` | 微信小程序 AppSecret（敏感） | — | |
-| `JWT_SECRET` | JWT 签名密钥（敏感） | — | |
-| `ADMIN_JWT_EXPIRES_IN` | 管理员 JWT 过期时间 | `24h` | |
-| `ADMIN_INIT_USERNAME` | 初始管理员账号 | `admin` | |
-| `ADMIN_INIT_PASSWORD` | 初始管理员密码（首次登录须修改） | `admin@123456` | |
+| 变量 | 来源 | 用途 | 默认值 | 必填 |
+|------|------|------|--------|:----:|
+| `PORT` | 基础服务 | 服务端口 | `3000`（HF: `7860`） | |
+| `NODE_ENV` | 基础服务 | 运行环境 | `development` | |
+| `TZ` | 基础服务 | 时区 | `Asia/Shanghai` | |
+| `LOG_LEVEL` | 基础服务 | 日志级别（trace/debug/info/warn/error/fatal） | `info` | |
+| `GEMINI_API_KEY` | AI 解读 | Google Gemini API 密钥 | — | **✅** |
+| `API_KEY` | 安全鉴权 | API 鉴权密钥（Bearer Token） | 空（不鉴权） | |
+| `CORS_ORIGIN` | 安全鉴权 | 跨域允许来源 | `*` | |
+| `DB_PATH` | 数据存储 | SQLite 数据库文件路径 | `./data/tarot.db` | |
+| `LOG_RETENTION_DAYS` | 数据存储 | 日志保留天数 | `30` | |
+| `PUPPETEER_EXECUTABLE_PATH` | 海报截图 | Chromium 可执行文件路径 | 系统自动查找 | |
+| `PUPPETEER_ARGS` | 海报截图 | Chromium 启动参数 | `--no-sandbox,...` | |
+| `CACHE_MAX_SIZE` | 缓存性能 | LRU 缓存最大条目数 | `100` | |
+| `CACHE_TTL_SECONDS` | 缓存性能 | 缓存 TTL（秒） | `3600` | |
+| `POOL_MAX_PAGES` | 海报截图 | 浏览器 Page 池大小 | `4` | |
+| `POOL_ACQUIRE_TIMEOUT_MS` | 海报截图 | 获取 Page 超时（ms） | `30000` | |
+| `WECHAT_APPID` | 微信认证 | 微信小程序 AppID | — | ⚠️ ¹ |
+| `WECHAT_SECRET` | 微信认证 | 微信小程序 AppSecret（敏感） | — | ⚠️ ¹ |
+| `JWT_SECRET` | 管理认证 | JWT 签名密钥（敏感） | — | ⚠️ ¹ |
+| `ADMIN_JWT_EXPIRES_IN` | 管理认证 | 管理员 JWT 过期时间 | `24h` | |
+| `ADMIN_INIT_USERNAME` | 管理认证 | 初始管理员账号 | `admin` | |
+| `ADMIN_INIT_PASSWORD` | 管理认证 | 初始管理员密码（首次登录须修改） | `admin@123456` | |
 
-> `GEMINI_API_KEY` 是唯一必填变量，其余均有合理默认值。
+> `GEMINI_API_KEY` 是唯一严格必填变量，其余均有合理默认值。
+> ¹ 启用微信小程序登录 / 管理后台时必填，纯 API 调用模式可跳过。
 > Docker 部署时 `PUPPETEER_EXECUTABLE_PATH` 和 `PUPPETEER_ARGS` 已在 Dockerfile 中硬编码。
-> 微信登录相关变量（`WECHAT_*`、`JWT_SECRET`）启用小程序登录功能时建议配置。
 
 ### 配置持久化
 
