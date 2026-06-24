@@ -301,6 +301,46 @@ curl "http://localhost:3000/health?noCache=1"
 
 > `/poster` 请求不存储 PNG 二进制，仅记录请求元数据和响应状态。
 
+## 实现顺序
+
+> 本节汇总 docs/ 目录下开发计划的落地时序。状态：✅ 已完成  🟡 进行中  ⬜ 待实施
+
+### 阶段 0：基础后端服务
+
+| 顺序 | 计划文档 | 范围 | 状态 |
+|:---:|---------|------|:---:|
+| 0.1 | （仓库初始提交） | Express + Gemini + 海报 + SQLite 日志骨架 | ✅ |
+
+### 阶段 1：可观测性增强
+
+| 顺序 | 计划文档 | 范围 | 状态 |
+|:---:|---------|------|:---:|
+| 1.1 | `docs/logging-enhancement-plan.md` | 访问日志 / 业务失败 / 模型切换 / 缓存命中 / 启动横幅 | ✅ |
+
+### 阶段 2：Admin 认证体系
+
+| 顺序 | 计划文档 | 范围 | 状态 |
+|:---:|---------|------|:---:|
+| 2.1 | `tarot-admin/docs/ADMIN_LOGIN_PLAN.md` 后端部分 | admins 表 / bcrypt / JWT / authMiddleware | ✅ |
+| 2.2 | `tarot-admin/docs/ADMIN_AUTH_UPGRADE_PLAN.md` §一 | must_change_password + 默认账号 + 移除 API Key 兼容 | ✅ |
+
+### 阶段 3：日志关联用户（多项目联动）
+
+| 顺序 | 计划文档 | 范围 | 状态 |
+|:---:|---------|------|:---:|
+| 3.1 | `tarot-miniprogram/docs/AUTH_PLAN.md` 后端 | users 表 / 微信登录 / 邮箱登录 / JWT | 🟡 |
+| 3.2 | `tarot-admin/docs/ADMIN_LOGS_USER_PLAN.md` 后端 | /logs JOIN users 返回 user_nickname 等字段 | ⬜ |
+
+### 阶段 4：未来规划
+
+- 用户管理 API 接口（`tarot-admin/docs/ADMIN_USERS_PLAN.md` §2）
+
+### 跨项目依赖
+
+- 📦 本项目被 tarot-admin 依赖：tarot-admin 阶段 1.x 需 tarot-backend 启动
+- 📦 本项目被 tarot-miniprogram 依赖：tarot-miniprogram 阶段 2.x 需 /auth/* 接口就绪
+- 📦 tarot-reading-api 已整合进本项目；tarot-poster-service 的海报逻辑并入本项目 src/poster/
+
 ## 部署
 
 ### Docker
