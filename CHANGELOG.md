@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-06-24
+
+### Added
+
+- 管理员 CRUD 接口：`GET /api/admin/admins`（列表）、`POST /api/admin/admins`（创建）、`PUT /api/admin/admins/:id`（编辑）、`DELETE /api/admin/admins/:id`（软删除）、`POST /api/admin/admins/:id/reset-password`（重置密码）
+- 所有管理员管理路由均需 `role=admin` 校验，禁止超管删除/禁用自身账号
+- `db/admin.ts` 新增 `listAdmins` / `updateAdmin` / `deleteAdmin` / `resetAdminPassword` 函数
+- 管理员列表支持分页和按用户名/显示名模糊搜索
+
 ## [2.2.1] - 2026-06-24
 
 ### Fixed

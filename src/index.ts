@@ -28,7 +28,11 @@ import { bindEmailHandler } from './auth/bind-email.js'
 import { bindPhoneHandler } from './auth/bind-phone.js'
 import { updateProfileHandler } from './auth/update-profile.js'
 import { getUserRecords, getRecordById, saveRecord, deleteRecord } from './db/reading-record.js'
-import { findAdminByUsername, updateLastLogin, initAdminIfNeeded, findAdminById, changePassword } from './db/admin.js'
+import {
+  findAdminByUsername, updateLastLogin, initAdminIfNeeded, findAdminById, changePassword,
+  createAdmin, listAdmins, updateAdmin, deleteAdmin, resetAdminPassword, validatePasswordStrength,
+  type AdminRow, type UpdateAdminInput,
+} from './db/admin.js'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
 import type { PosterData } from './poster/types.js'
@@ -281,6 +285,186 @@ app.post('/admin/auth/change-password', adminAuthMiddleware, async (req, res) =>
     res.json({ message: '密码修改成功，请使用新密码重新登录' })
   } catch (err) {
     log.error({ err }, 'Change password failed')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '服务器内部错误' })
+  }
+})
+
+// ========== 超管专用：管理员 CRUD（role=admin 才可操作）==========
+
+/** 校验请求是否为 role=admin 的超管 */
+function requireAdminRole(req: Request, res: Response): boolean {
+  const role = (req as any).adminRole as string | undefined
+  if (role !== 'admin') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '仅超级管理员可执行此操作' })
+    return false
+  }
+  return true
+}
+
+// 管理员列表
+app.get('/api/admin/admins', adminAuthMiddleware, async (req, res) => {
+  if (!requireAdminRole(req, res)) return
+  try {
+    const page = parseInt(req.query.page as string) || 1
+    const pageSize = Math.min(parseInt(req.query.pageSize as string) || 20, 100)
+    const search = req.query.search as string | undefined
+    const result = await listAdmins(page, pageSize, search)
+    res.json({ success: true, data: result })
+  } catch (err) {
+    log.error({ err }, 'Failed to list admins')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '服务器内部错误' })
+  }
+})
+
+// 创建管理员
+app.post('/api/admin/admins', adminAuthMiddleware, async (req, res) => {
+  if (!requireAdminRole(req, res)) return
+  try {
+    const { username, displayName, password, role: newRole } = req.body as {
+      username?: string
+      displayName?: string
+      password?: string
+      role?: string
+    }
+
+    if (!username || !displayName || !password) {
+      res.status(400).json({ error: 'INVALID_INPUT', message: '用户名、显示名和密码为必填项' })
+      return
+    }
+
+    const strengthError = validatePasswordStrength(password)
+    if (strengthError) {
+      res.status(400).json({ error: 'WEAK_PASSWORD', message: strengthError })
+      return
+    }
+
+    const existing = await findAdminByUsername(username)
+    if (existing) {
+      res.status(409).json({ error: 'CONFLICT', message: '该用户名已存在' })
+      return
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10)
+    const admin = await createAdmin({
+      username,
+      passwordHash,
+      displayName,
+      role: newRole === 'readonly' ? 'readonly' : 'admin',
+    })
+    log.info({ adminId: admin.id, username, operator: (req as any).adminUsername }, 'Admin created')
+
+    res.status(201).json({
+      success: true,
+      data: {
+        id: admin.id,
+        username: admin.username,
+        displayName: admin.display_name,
+        role: admin.role,
+        isActive: true,
+        createdAt: admin.created_at,
+      },
+    })
+  } catch (err) {
+    log.error({ err }, 'Failed to create admin')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '服务器内部错误' })
+  }
+})
+
+// 编辑管理员
+app.put('/api/admin/admins/:id', adminAuthMiddleware, async (req, res) => {
+  if (!requireAdminRole(req, res)) return
+  try {
+    const targetId = req.params.id
+    const operatorId = (req as any).adminId as string
+    const { displayName, role: newRole, isActive } = req.body as UpdateAdminInput
+
+    const target = await findAdminById(targetId)
+    if (!target) {
+      res.status(404).json({ error: 'NOT_FOUND', message: '管理员不存在' })
+      return
+    }
+
+    // 禁止禁用自己
+    if (targetId === operatorId && isActive === false) {
+      res.status(400).json({ error: 'NOT_ALLOWED', message: '不能禁用自己的账号' })
+      return
+    }
+
+    const updateData: UpdateAdminInput = {}
+    if (displayName !== undefined) updateData.displayName = displayName
+    if (newRole !== undefined) updateData.role = newRole
+    if (isActive !== undefined) updateData.isActive = isActive
+
+    await updateAdmin(targetId, updateData)
+    log.info({ targetId, operator: (req as any).adminUsername, changes: updateData }, 'Admin updated')
+
+    res.json({ success: true, message: '管理员信息已更新' })
+  } catch (err) {
+    log.error({ err }, 'Failed to update admin')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '服务器内部错误' })
+  }
+})
+
+// 删除管理员（软删除）
+app.delete('/api/admin/admins/:id', adminAuthMiddleware, async (req, res) => {
+  if (!requireAdminRole(req, res)) return
+  try {
+    const targetId = req.params.id
+    const operatorId = (req as any).adminId as string
+
+    // 禁止删除自己
+    if (targetId === operatorId) {
+      res.status(400).json({ error: 'NOT_ALLOWED', message: '不能删除自己的账号' })
+      return
+    }
+
+    const target = await findAdminById(targetId)
+    if (!target) {
+      res.status(404).json({ error: 'NOT_FOUND', message: '管理员不存在' })
+      return
+    }
+
+    await deleteAdmin(targetId)
+    log.info({ targetId, operator: (req as any).adminUsername, targetUsername: target.username }, 'Admin deleted')
+
+    res.json({ success: true, message: '管理员已删除' })
+  } catch (err) {
+    log.error({ err }, 'Failed to delete admin')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '服务器内部错误' })
+  }
+})
+
+// 重置管理员密码
+app.post('/api/admin/admins/:id/reset-password', adminAuthMiddleware, async (req, res) => {
+  if (!requireAdminRole(req, res)) return
+  try {
+    const targetId = req.params.id
+    const { password } = req.body as { password?: string }
+
+    if (!password) {
+      res.status(400).json({ error: 'INVALID_INPUT', message: '新密码为必填项' })
+      return
+    }
+
+    const strengthError = validatePasswordStrength(password)
+    if (strengthError) {
+      res.status(400).json({ error: 'WEAK_PASSWORD', message: strengthError })
+      return
+    }
+
+    const target = await findAdminById(targetId)
+    if (!target) {
+      res.status(404).json({ error: 'NOT_FOUND', message: '管理员不存在' })
+      return
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10)
+    await resetAdminPassword(targetId, passwordHash)
+    log.info({ targetId, operator: (req as any).adminUsername, targetUsername: target.username }, 'Admin password reset')
+
+    res.json({ success: true, message: '密码已重置，该管理员下次登录时需修改密码' })
+  } catch (err) {
+    log.error({ err }, 'Failed to reset admin password')
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '服务器内部错误' })
   }
 })
