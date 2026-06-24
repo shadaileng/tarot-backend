@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-06-24
+
+### Changed
+
+- **BREAKING**: 所有 API 路由统一加 `/api` 前缀：
+  - `/cards` → `/api/cards`
+  - `/health` → `/api/health`
+  - `/metrics` → `/api/metrics`
+  - `/reading` → `/api/reading`
+  - `/poster` → `/api/poster`
+  - `/logs` → `/api/logs`, `/logs/:id` → `/api/logs/:id`
+  - `/auth/*` → `/api/auth/*`
+  - `/user/*` → `/api/user/*`
+
 ## [1.12.0] - 2026-06-24
 
 ### Added

@@ -40,7 +40,7 @@ const app: express.Express = express()
 app.use(express.json({ limit: '1mb' }))
 app.use(corsMiddleware)
 
-app.use('/cards', express.static(path.join(__dirname, '../assets/cards')))
+app.use('/api/cards', express.static(path.join(__dirname, '../assets/cards')))
 
 app.use(loggingMiddleware)
 
@@ -50,29 +50,29 @@ app.get('/', (_req, res) => {
     version: '1.0.0',
     status: 'running',
     endpoints: {
-      reading: 'POST /reading',
-      poster: 'POST /poster',
-      health: 'GET /health',
-      metrics: 'GET /metrics',
-      logs: 'GET /logs',
+      reading: 'POST /api/reading',
+      poster: 'POST /api/poster',
+      health: 'GET /api/health',
+      metrics: 'GET /api/metrics',
+      logs: 'GET /api/logs',
       auth: {
-        wechatLogin: 'POST /auth/wechat-login',
-        emailRegister: 'POST /auth/email-register',
-        emailLogin: 'POST /auth/email-login',
-        bindEmail: 'POST /auth/bind-email',
-        bindPhone: 'POST /auth/bind-phone',
+        wechatLogin: 'POST /api/auth/wechat-login',
+        emailRegister: 'POST /api/auth/email-register',
+        emailLogin: 'POST /api/auth/email-login',
+        bindEmail: 'POST /api/auth/bind-email',
+        bindPhone: 'POST /api/auth/bind-phone',
       },
       user: {
-        profile: 'PUT /user/profile',
-        records: 'GET /user/records',
-        recordById: 'GET /user/records/:id',
-        deleteRecord: 'DELETE /user/records/:id',
+        profile: 'PUT /api/user/profile',
+        records: 'GET /api/user/records',
+        recordById: 'GET /api/user/records/:id',
+        deleteRecord: 'DELETE /api/user/records/:id',
       },
     },
   })
 })
 
-app.get('/health', async (req, res) => {
+app.get('/api/health', async (req, res) => {
   const poolStats = await getPoolStats()
   const snap = metrics.getSnapshot()
   const noCache = req.query.noCache === '1'
@@ -132,7 +132,7 @@ app.get('/health', async (req, res) => {
   res.status(httpStatus).json(responseBody)
 })
 
-app.get('/metrics', (_req, res) => {
+app.get('/api/metrics', (_req, res) => {
   res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
   res.send(metrics.toPrometheus())
 })
@@ -140,22 +140,22 @@ app.get('/metrics', (_req, res) => {
 // ========== 认证相关路由 ==========
 
 // 登录与注册（无需鉴权）
-app.post('/auth/wechat-login', wechatLoginHandler)
-app.post('/auth/email-register', emailRegisterHandler)
-app.post('/auth/email-login', emailLoginHandler)
+app.post('/api/auth/wechat-login', wechatLoginHandler)
+app.post('/api/auth/email-register', emailRegisterHandler)
+app.post('/api/auth/email-login', emailLoginHandler)
 
 // 账号绑定（需要 JWT 鉴权）
-app.post('/auth/bind-email', jwtAuthMiddleware, bindEmailHandler)
-app.post('/auth/bind-phone', jwtAuthMiddleware, bindPhoneHandler)
+app.post('/api/auth/bind-email', jwtAuthMiddleware, bindEmailHandler)
+app.post('/api/auth/bind-phone', jwtAuthMiddleware, bindPhoneHandler)
 
 // 用户资料（需要 JWT 鉴权）
-app.put('/user/profile', jwtAuthMiddleware, updateProfileHandler)
+app.put('/api/user/profile', jwtAuthMiddleware, updateProfileHandler)
 
 // ========== 业务接口（JWT 鉴权 + 频率限制）==========
 
-app.post('/reading', jwtAuthMiddleware, rateLimitMiddleware, readingHandler)
+app.post('/api/reading', jwtAuthMiddleware, rateLimitMiddleware, readingHandler)
 
-app.post('/poster', jwtAuthMiddleware, async (req, res) => {
+app.post('/api/poster', jwtAuthMiddleware, async (req, res) => {
   const requestStart = Date.now()
   const posterData = req.body as PosterData
   const template = getTemplate(posterData.template)
@@ -234,7 +234,7 @@ app.post('/poster', jwtAuthMiddleware, async (req, res) => {
   }
 })
 
-app.get('/logs', authMiddleware, async (req, res) => {
+app.get('/api/logs', authMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
   const target = req.query.target as string | undefined
@@ -242,7 +242,7 @@ app.get('/logs', authMiddleware, async (req, res) => {
   res.json(result)
 })
 
-app.get('/logs/:id', authMiddleware, async (req, res) => {
+app.get('/api/logs/:id', authMiddleware, async (req, res) => {
   const log = await getLogById(req.params.id)
   if (!log) {
     res.status(404).json({ error: 'Log not found' })
@@ -261,7 +261,7 @@ app.get('/api/admin/users', authMiddleware, async (req, res) => {
 
 // ========== 用户级占卜记录（JWT 鉴权）==========
 
-app.post('/user/records', jwtAuthMiddleware, async (req, res) => {
+app.post('/api/user/records', jwtAuthMiddleware, async (req, res) => {
   const { spreadType, question, cardsJson, reading, model, isLocal } = req.body as {
     spreadType: string
     question?: string
@@ -292,14 +292,14 @@ app.post('/user/records', jwtAuthMiddleware, async (req, res) => {
   }
 })
 
-app.get('/user/records', jwtAuthMiddleware, async (req, res) => {
+app.get('/api/user/records', jwtAuthMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1
   const limit = Math.min(parseInt(req.query.limit as string) || 20, 100)
   const result = await getUserRecords(req.userId!, page, limit)
   res.json(result)
 })
 
-app.get('/user/records/:id', jwtAuthMiddleware, async (req, res) => {
+app.get('/api/user/records/:id', jwtAuthMiddleware, async (req, res) => {
   const record = await getRecordById(req.userId!, req.params.id)
   if (!record) {
     res.status(404).json({ error: 'Record not found' })
@@ -308,7 +308,7 @@ app.get('/user/records/:id', jwtAuthMiddleware, async (req, res) => {
   res.json(record)
 })
 
-app.delete('/user/records/:id', jwtAuthMiddleware, async (req, res) => {
+app.delete('/api/user/records/:id', jwtAuthMiddleware, async (req, res) => {
   const deleted = await deleteRecord(req.userId!, req.params.id)
   if (!deleted) {
     res.status(404).json({ error: 'Record not found' })
