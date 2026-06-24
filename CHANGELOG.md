@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.1] - 2026-06-24
+
+### Fixed
+
+- 修复 `PUT /api/config/:key` 只读管理员（`readonly` 角色）可通过 API 直接修改配置的安全漏洞，增加角色校验返回 403
+
 ## [2.3.0] - 2026-06-24
 
 ### Added

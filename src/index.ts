@@ -664,6 +664,12 @@ app.put('/api/config/:key', adminAuthMiddleware, async (req, res) => {
   const { key } = req.params
   const { value } = req.body as { value: string }
 
+  // 只读管理员不允许修改配置
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改配置' })
+    return
+  }
+
   const meta = configMeta.find((m) => m.envKey === key)
   if (!meta) {
     res.status(404).json({ error: `Unknown config key: ${key}` })
