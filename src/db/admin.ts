@@ -51,7 +51,7 @@ export async function createAdmin(options: CreateAdminOptions): Promise<AdminRow
   const now = new Date().toISOString()
   db.run(
     'INSERT INTO admins (id, username, password_hash, display_name, role, created_at, is_active, must_change_password) VALUES (?, ?, ?, ?, ?, ?, 1, ?)',
-    [id, username, passwordHash, displayName, role, mustChangePassword],
+    [id, username, passwordHash, displayName, role, now, mustChangePassword],
   )
   saveDb()
   return {
