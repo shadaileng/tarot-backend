@@ -23,6 +23,92 @@ function maskPhone(phone: string): string {
   return phone.slice(0, 3) + '****' + phone.slice(-4)
 }
 
+/** 邮箱脱敏 */
+function maskEmail(email: string | null): string | null {
+  if (!email) return null
+  const [local, domain] = email.split('@')
+  if (!domain) return email
+  const visible = local.length > 1 ? local[0] + '***' : '***'
+  return visible + '@' + domain
+}
+
+// ==================== 用户查询（Admin 端） ====================
+
+export interface AdminUserRow {
+  id: string
+  openid: string
+  nickname: string
+  avatar_url: string | null
+  email: string | null
+  phone: string | null
+  created_at: string
+  last_login_at: string | null
+  request_count: number
+  last_request_at: string | null
+}
+
+export interface UserQueryResult {
+  total: number
+  page: number
+  limit: number
+  data: AdminUserRow[]
+}
+
+/** 查询用户列表（Admin 管理页面），支持按昵称/邮箱模糊搜索，含请求统计 */
+export async function queryUsers(
+  page: number = 1,
+  limit: number = 20,
+  keyword?: string,
+): Promise<UserQueryResult> {
+  const db = await getDb()
+  const where: string[] = []
+  const params: any[] = []
+
+  if (keyword) {
+    where.push('(u.nickname LIKE ? OR u.email LIKE ?)')
+    params.push(`%${keyword}%`, `%${keyword}%`)
+  }
+
+  const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : ''
+
+  // count
+  const countResult = db.exec(
+    `SELECT COUNT(*) as cnt FROM users u ${whereClause}`,
+    params,
+  )
+  const total =
+    countResult.length > 0 && countResult[0].values.length > 0
+      ? Number(countResult[0].values[0][0])
+      : 0
+
+  // data — 带请求统计，按最近请求时间倒序
+  const offset = (page - 1) * limit
+  const querySql = `
+    SELECT
+      u.id, u.openid, u.nickname, u.avatar_url, u.email, u.phone,
+      u.created_at, u.last_login_at,
+      COUNT(l.id)   AS request_count,
+      MAX(l.created_at) AS last_request_at
+    FROM users u
+    LEFT JOIN reading_logs l ON u.id = l.user_id
+    ${whereClause}
+    GROUP BY u.id
+    ORDER BY last_request_at DESC
+    LIMIT ? OFFSET ?
+  `
+  const stmt = db.prepare(querySql)
+  stmt.bind([...params, limit, offset])
+  const rows: AdminUserRow[] = []
+  while (stmt.step()) {
+    const row = stmt.getAsObject() as unknown as AdminUserRow
+    row.email = maskEmail(row.email)
+    rows.push(row)
+  }
+  stmt.free()
+
+  return { total, page, limit, data: rows }
+}
+
 // ==================== 查询 ====================
 
 /** 按 openid 查找用户 */

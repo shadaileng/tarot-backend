@@ -18,6 +18,7 @@ import { getLogger } from './logger.js'
 import { readingHandler } from './reading/handler.js'
 import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } from './reading/models.js'
 import { queryLogs, getLogById } from './db/reading-log.js'
+import { queryUsers } from './db/user.js'
 import { getAllConfig, upsertConfig, initDefaultConfig, loadUserConfig } from './db/config.js'
 import { getDb } from './db/index.js'
 import { wechatLoginHandler } from './auth/wechat-login.js'
@@ -248,6 +249,14 @@ app.get('/logs/:id', authMiddleware, async (req, res) => {
     return
   }
   res.json(log)
+})
+
+app.get('/api/admin/users', authMiddleware, async (req, res) => {
+  const page = parseInt(req.query.page as string) || 1
+  const limit = Math.min(parseInt(req.query.limit as string) || 20, 100)
+  const keyword = req.query.keyword as string | undefined
+  const result = await queryUsers(page, limit, keyword)
+  res.json(result)
 })
 
 // ========== 用户级占卜记录（JWT 鉴权）==========
