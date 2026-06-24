@@ -95,12 +95,36 @@ export interface UpdateProfileRequest {
   avatarUrl?: string
 }
 
+/** Admin JWT payload */
+export interface AdminJwtPayload {
+  sub: string      // admin.id
+  username: string
+  role: string     // 'admin' | 'readonly'
+  type: 'admin'
+}
+
+/** Admin 数据库行 */
+export interface AdminRow {
+  id: string
+  username: string
+  password_hash: string
+  display_name: string
+  role: string
+  created_at: string
+  last_login_at: string | null
+  is_active: number
+}
+
 /** Express Request 扩展 */
 declare global {
   namespace Express {
     interface Request {
       userId?: string
       openid?: string
+      /** Admin JWT 鉴权后注入 */
+      adminId?: string
+      adminUsername?: string
+      adminRole?: string
     }
   }
 }

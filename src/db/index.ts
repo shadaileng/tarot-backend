@@ -115,6 +115,22 @@ function initSchema(database: Database): void {
   database.run('CREATE INDEX IF NOT EXISTS idx_records_user_id ON reading_records(user_id)')
   database.run('CREATE INDEX IF NOT EXISTS idx_records_created_at ON reading_records(created_at DESC)')
 
+  // ========== 管理员表 ==========
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS admins (
+      id            TEXT PRIMARY KEY,
+      username      TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name  TEXT NOT NULL DEFAULT '',
+      role          TEXT NOT NULL DEFAULT 'admin',
+      created_at    TEXT NOT NULL,
+      last_login_at TEXT,
+      is_active     INTEGER NOT NULL DEFAULT 1
+    )
+  `)
+  database.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_admins_username ON admins(username)')
+
   // 兼容已有数据库：为 reading_logs 新增 user_id 列
   try {
     database.run('ALTER TABLE reading_logs ADD COLUMN user_id TEXT')

@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-06-24
+
+### Added
+
+- Admin JWT 登录体系：新增 `admins` 表（管理员独立账号、bcrypt 密码、支持 admin/readonly 角色）
+- 认证接口：`POST /admin/auth/login`（登录，失败限流 5次/min）、`POST /admin/auth/logout`、`GET /admin/auth/me`
+- `adminAuthMiddleware`（JWT 鉴权，验证 type=admin）与 `adminCompatMiddleware`（支持 api_key / jwt / dual 三种模式）
+- 首次启动时通过 `ADMIN_INIT_USERNAME` / `ADMIN_INIT_PASSWORD` 环境变量自动创建初始管理员
+- 可配置项：`ADMIN_AUTH_MODE`（api_key | jwt | dual）、`ADMIN_JWT_EXPIRES_IN`（默认 24h）
+
+### Changed
+
+- Admin 受保护路由（`/api/logs`、`/api/admin/users`、`/api/config`）从 `authMiddleware` 迁移到 `adminCompatMiddleware`，过渡期默认 dual 模式兼容旧 API Key
+
 ## [2.0.1] - 2026-06-24
 
 ### Fixed

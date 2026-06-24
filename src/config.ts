@@ -30,6 +30,11 @@ export const configMeta: ConfigMeta[] = [
   { key: 'WECHAT_APPID',  envKey: 'WECHAT_APPID',  group: '微信配置', editable: false, sensitive: false, type: 'string', defaultValue: '' },
   { key: 'WECHAT_SECRET', envKey: 'WECHAT_SECRET', group: '微信配置', editable: false, sensitive: true,  type: 'string', defaultValue: '' },
   { key: 'JWT_SECRET',    envKey: 'JWT_SECRET',    group: '安全配置', editable: false, sensitive: true,  type: 'string', defaultValue: '' },
+
+  { key: 'ADMIN_AUTH_MODE',      envKey: 'ADMIN_AUTH_MODE',      group: '安全配置', editable: false, type: 'string', defaultValue: 'dual' },
+  { key: 'ADMIN_JWT_EXPIRES_IN', envKey: 'ADMIN_JWT_EXPIRES_IN', group: '安全配置', editable: true,  type: 'string', defaultValue: '24h' },
+  { key: 'ADMIN_INIT_USERNAME',  envKey: 'ADMIN_INIT_USERNAME',  group: '安全配置', editable: false, sensitive: true, type: 'string', defaultValue: '' },
+  { key: 'ADMIN_INIT_PASSWORD',  envKey: 'ADMIN_INIT_PASSWORD',  group: '安全配置', editable: false, sensitive: true, type: 'string', defaultValue: '' },
 ]
 
 export const config = {
@@ -67,6 +72,11 @@ export const config = {
     path: process.env.DB_PATH || './data/tarot.db',
     retentionDays: parseInt(process.env.LOG_RETENTION_DAYS || '30', 10),
   },
+
+  adminAuthMode: process.env.ADMIN_AUTH_MODE || 'dual',
+  adminJwtExpiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '24h',
+  adminInitUsername: process.env.ADMIN_INIT_USERNAME || '',
+  adminInitPassword: process.env.ADMIN_INIT_PASSWORD || '',
 }
 
 export function getConfigDefaults(): Record<string, string> {
@@ -122,6 +132,12 @@ export function updateConfig(key: string, value: string): void {
       break
     case 'LOG_RETENTION_DAYS':
       config.db.retentionDays = parseInt(value, 10)
+      break
+    case 'ADMIN_AUTH_MODE':
+      config.adminAuthMode = value
+      break
+    case 'ADMIN_JWT_EXPIRES_IN':
+      config.adminJwtExpiresIn = value
       break
   }
 }

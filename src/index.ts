@@ -5,6 +5,7 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import { config, configMeta, updateConfig, maskSensitiveValue, getConfigDefaults } from './config.js'
 import { corsMiddleware } from './middleware/cors.js'
 import { authMiddleware } from './middleware/auth.js'
+import { adminCompatMiddleware } from './middleware/admin-compat.js'
 import { jwtAuthMiddleware } from './middleware/jwt-auth.js'
 import { rateLimitMiddleware } from './middleware/rate-limit.js'
 import { loggingMiddleware } from './gateway/logging.js'
@@ -28,6 +29,9 @@ import { bindEmailHandler } from './auth/bind-email.js'
 import { bindPhoneHandler } from './auth/bind-phone.js'
 import { updateProfileHandler } from './auth/update-profile.js'
 import { getUserRecords, getRecordById, saveRecord, deleteRecord } from './db/reading-record.js'
+import { findAdminByUsername, updateLastLogin, initAdminIfNeeded } from './db/admin.js'
+import jwt from 'jsonwebtoken'
+import bcrypt from 'bcrypt'
 import type { PosterData } from './poster/types.js'
 
 const log = getLogger('API')
@@ -151,6 +155,89 @@ app.post('/api/auth/bind-phone', jwtAuthMiddleware, bindPhoneHandler)
 // 用户资料（需要 JWT 鉴权）
 app.put('/api/user/profile', jwtAuthMiddleware, updateProfileHandler)
 
+// ========== Admin 认证路由 ==========
+
+// Admin 登录（公开，但有限流）
+const adminLoginRateLimit = new Map<string, { count: number; resetAt: number }>()
+function checkAdminLoginRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const entry = adminLoginRateLimit.get(ip)
+  if (!entry || now > entry.resetAt) {
+    adminLoginRateLimit.set(ip, { count: 1, resetAt: now + 60_000 })
+    return true
+  }
+  if (entry.count >= 5) return false
+  entry.count++
+  return true
+}
+
+app.post('/admin/auth/login', async (req, res) => {
+  const ip = req.ip || req.socket.remoteAddress || ''
+
+  if (!checkAdminLoginRateLimit(ip)) {
+    res.status(429).json({ error: 'RATE_LIMITED', message: '登录频率过高，请 1 分钟后重试' })
+    return
+  }
+
+  const { username, password } = req.body as { username?: string; password?: string }
+
+  if (!username || !password) {
+    res.status(400).json({ error: 'INVALID_INPUT', message: '用户名和密码为必填项' })
+    return
+  }
+
+  try {
+    const admin = await findAdminByUsername(username)
+
+    if (!admin || admin.is_active !== 1) {
+      res.status(401).json({ error: 'INVALID_CREDENTIALS', message: '用户名或密码错误' })
+      return
+    }
+
+    const passwordMatch = await bcrypt.compare(password, admin.password_hash)
+    if (!passwordMatch) {
+      res.status(401).json({ error: 'INVALID_CREDENTIALS', message: '用户名或密码错误' })
+      return
+    }
+
+    await updateLastLogin(admin.id)
+
+    const secret = config.jwtSecret || 'dev-secret-do-not-use-in-production'
+    const token = jwt.sign(
+      { sub: admin.id, username: admin.username, role: admin.role, type: 'admin' },
+      secret,
+      { expiresIn: config.adminJwtExpiresIn || '24h' },
+    )
+
+    res.json({
+      token,
+      admin: {
+        id: admin.id,
+        username: admin.username,
+        displayName: admin.display_name,
+        role: admin.role,
+      },
+    })
+  } catch (err) {
+    log.error({ err }, 'Admin login failed')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '服务器内部错误' })
+  }
+})
+
+// Admin 登出（纯前端清除 token，后端无状态）
+app.post('/admin/auth/logout', adminCompatMiddleware, (_req, res) => {
+  res.json({ message: '已退出登录' })
+})
+
+// 获取当前 Admin 信息
+app.get('/admin/auth/me', adminCompatMiddleware, (req, res) => {
+  res.json({
+    id: (req as any).adminId || '',
+    username: (req as any).adminUsername || '',
+    role: (req as any).adminRole || '',
+  })
+})
+
 // ========== 业务接口（JWT 鉴权 + 频率限制）==========
 
 app.post('/api/reading', jwtAuthMiddleware, rateLimitMiddleware, readingHandler)
@@ -234,7 +321,7 @@ app.post('/api/poster', jwtAuthMiddleware, async (req, res) => {
   }
 })
 
-app.get('/api/logs', authMiddleware, async (req, res) => {
+app.get('/api/logs', adminCompatMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
   const target = req.query.target as string | undefined
@@ -242,7 +329,7 @@ app.get('/api/logs', authMiddleware, async (req, res) => {
   res.json(result)
 })
 
-app.get('/api/logs/:id', authMiddleware, async (req, res) => {
+app.get('/api/logs/:id', adminCompatMiddleware, async (req, res) => {
   const log = await getLogById(req.params.id)
   if (!log) {
     res.status(404).json({ error: 'Log not found' })
@@ -251,7 +338,7 @@ app.get('/api/logs/:id', authMiddleware, async (req, res) => {
   res.json(log)
 })
 
-app.get('/api/admin/users', authMiddleware, async (req, res) => {
+app.get('/api/admin/users', adminCompatMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1
   const limit = Math.min(parseInt(req.query.limit as string) || 20, 100)
   const keyword = req.query.keyword as string | undefined
@@ -342,7 +429,7 @@ app.get('/api/config', async (_req, res) => {
   res.json({ groups: Array.from(groups.entries()).map(([name, items]) => ({ name, items })) })
 })
 
-app.put('/api/config/:key', authMiddleware, async (req, res) => {
+app.put('/api/config/:key', adminCompatMiddleware, async (req, res) => {
   const { key } = req.params
   const { value } = req.body as { value: string }
 
@@ -409,6 +496,9 @@ async function start(): Promise<void> {
   if (restored.length > 0) {
     log.info({ restored }, 'Restored user config from database')
   }
+
+  // 初始化管理员账号（首次部署时）
+  await initAdminIfNeeded()
 
   // 输出配置来源分组（from_env / from_default / from_user）
   {
