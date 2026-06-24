@@ -264,6 +264,7 @@ export async function callGeminiReading(apiKey: string, question: string | undef
   let lastErrorStatus = 0
   let lastErrorText = ''
   let lastUsedModel = ''
+  let fallbackReading: { reading: string; model: string; incomplete: boolean; truncated: boolean } | null = null
 
   for (const model of modelsToTry) {
     const geminiResponse = await fetch(
@@ -296,6 +297,21 @@ export async function callGeminiReading(apiKey: string, question: string | undef
       const truncated = finishReason === 'MAX_TOKENS'
       const hasSummary = /✨\s*\*{0,2}综合解读/.test(reading)
       const incomplete = truncated || !hasSummary
+
+      // 1. 空读解 → 视为失败，重试下一个模型
+      if (!reading || reading.trim().length === 0) {
+        log.warn({ model, finishReason }, 'Gemini returned empty reading, trying next model')
+        continue
+      }
+
+      // 2. 不完整但有更多模型 → 保存结果，继续尝试获取更好的
+      if (incomplete && modelsToTry.indexOf(model) < modelsToTry.length - 1) {
+        log.warn({ model, readingLength: reading.length }, 'Reading incomplete, trying next model for better result')
+        if (!fallbackReading) {
+          fallbackReading = { reading, model, incomplete, truncated }
+        }
+        continue
+      }
 
       log.info({ model, finishReason, incomplete, readingLength: reading.length }, 'Gemini reading generated successfully')
 
@@ -335,6 +351,24 @@ export async function callGeminiReading(apiKey: string, question: string | undef
     }
 
     break
+  }
+
+  // 所有模型都未能返回完整读解，但可能有 fallback（不完整的结果）
+  if (fallbackReading) {
+    log.warn({
+      model: fallbackReading.model,
+      readingLength: fallbackReading.reading.length,
+    }, 'All models tried, returning best available (incomplete) reading')
+    return {
+      success: true,
+      reading: fallbackReading.reading,
+      model: fallbackReading.model,
+      incomplete: true,
+      status: 200,
+      warning: fallbackReading.truncated
+        ? '解读可能不完整，AI 输出被 token 限制截断'
+        : '解读格式不完整，缺少综合解读部分',
+    }
   }
 
   const exhaustedList = [...quotaExhaustedCache.models]
