@@ -14,7 +14,6 @@ export const configMeta: ConfigMeta[] = [
 
   { key: 'GEMINI_API_KEY', envKey: 'GEMINI_API_KEY', group: 'AI 配置', editable: true, sensitive: true, type: 'string', defaultValue: '' },
 
-  { key: 'API_KEY', envKey: 'API_KEY', group: '安全配置', editable: false, sensitive: true, type: 'string', defaultValue: '' },
   { key: 'CORS_ORIGIN', envKey: 'CORS_ORIGIN', group: '安全配置', editable: false, type: 'string', defaultValue: '*' },
 
   { key: 'DB_PATH', envKey: 'DB_PATH', group: '数据库', editable: false, type: 'string', defaultValue: './data/tarot.db' },
@@ -31,10 +30,9 @@ export const configMeta: ConfigMeta[] = [
   { key: 'WECHAT_SECRET', envKey: 'WECHAT_SECRET', group: '微信配置', editable: false, sensitive: true,  type: 'string', defaultValue: '' },
   { key: 'JWT_SECRET',    envKey: 'JWT_SECRET',    group: '安全配置', editable: false, sensitive: true,  type: 'string', defaultValue: '' },
 
-  { key: 'ADMIN_AUTH_MODE',      envKey: 'ADMIN_AUTH_MODE',      group: '安全配置', editable: false, type: 'string', defaultValue: 'dual' },
   { key: 'ADMIN_JWT_EXPIRES_IN', envKey: 'ADMIN_JWT_EXPIRES_IN', group: '安全配置', editable: true,  type: 'string', defaultValue: '24h' },
-  { key: 'ADMIN_INIT_USERNAME',  envKey: 'ADMIN_INIT_USERNAME',  group: '安全配置', editable: false, sensitive: true, type: 'string', defaultValue: '' },
-  { key: 'ADMIN_INIT_PASSWORD',  envKey: 'ADMIN_INIT_PASSWORD',  group: '安全配置', editable: false, sensitive: true, type: 'string', defaultValue: '' },
+  { key: 'ADMIN_INIT_USERNAME',  envKey: 'ADMIN_INIT_USERNAME',  group: '安全配置', editable: false, sensitive: false, type: 'string', defaultValue: 'admin' },
+  { key: 'ADMIN_INIT_PASSWORD',  envKey: 'ADMIN_INIT_PASSWORD',  group: '安全配置', editable: false, sensitive: true, type: 'string', defaultValue: 'admin@123456' },
 ]
 
 export const config = {
@@ -42,8 +40,6 @@ export const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
 
   timezone: process.env.TZ || 'Asia/Shanghai',
-
-  apiKey: process.env.API_KEY || '',
 
   wechatAppId: process.env.WECHAT_APPID || '',
   wechatSecret: process.env.WECHAT_SECRET || '',
@@ -73,10 +69,9 @@ export const config = {
     retentionDays: parseInt(process.env.LOG_RETENTION_DAYS || '30', 10),
   },
 
-  adminAuthMode: process.env.ADMIN_AUTH_MODE || 'dual',
   adminJwtExpiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '24h',
-  adminInitUsername: process.env.ADMIN_INIT_USERNAME || '',
-  adminInitPassword: process.env.ADMIN_INIT_PASSWORD || '',
+  adminInitUsername: process.env.ADMIN_INIT_USERNAME || 'admin',
+  adminInitPassword: process.env.ADMIN_INIT_PASSWORD || 'admin@123456',
 }
 
 export function getConfigDefaults(): Record<string, string> {
@@ -99,9 +94,6 @@ export function updateConfig(key: string, value: string): void {
       break
     case 'GEMINI_API_KEY':
       config.geminiApiKey = value
-      break
-    case 'API_KEY':
-      config.apiKey = value
       break
     case 'WECHAT_APPID':
       config.wechatAppId = value
@@ -132,9 +124,6 @@ export function updateConfig(key: string, value: string): void {
       break
     case 'LOG_RETENTION_DAYS':
       config.db.retentionDays = parseInt(value, 10)
-      break
-    case 'ADMIN_AUTH_MODE':
-      config.adminAuthMode = value
       break
     case 'ADMIN_JWT_EXPIRES_IN':
       config.adminJwtExpiresIn = value

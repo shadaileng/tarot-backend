@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-06-24
+
+### Added
+
+- 默认管理员账号：首次启动时自动创建 `admin` 账号（默认密码 `admin@123456`），无需手动设置环境变量即可登录
+- 强制改密流程：默认管理员账号首次登录必须修改密码，服务端 `must_change_password` 标记 + 密码强度校验（≥8 位 + 字母 + 数字）
+- 改密接口：`POST /admin/auth/change-password`（Admin JWT 鉴权），校验旧密码后更新为新密码（bcrypt 哈希），同步清除 `must_change_password` 标记
+- `/admin/auth/me` 接口增强：从数据库查询真实管理员信息，新增 `mustChangePassword` 字段
+- `/admin/auth/login` 响应新增 `mustChangePassword` 字段，前端可根据该标记决定是否跳转改密页
+- 启动日志新增 `adminDefaultAccount` 字段，可见当前默认管理员账号
+
+### Changed
+
+- Admin 鉴权从兼容模式（api_key / jwt / dual）全面迁移到纯 JWT：所有受保护路由统一使用 `adminAuthMiddleware`
+- `/admin/auth/me` 响应不再依赖 token payload，改为查询 `admins` 表获取实时数据
+
+### Removed
+
+- 完全移除 API Key 兼容：删除 `middleware/auth.ts`（API Key 认证）和 `middleware/admin-compat.ts`（兼容中间件）
+- 删除 `configMeta` 中 `API_KEY` 和 `ADMIN_AUTH_MODE` 配置项，`updateConfig` 移除对应分支
+
 ## [2.1.0] - 2026-06-24
 
 ### Added

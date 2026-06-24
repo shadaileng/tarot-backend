@@ -119,17 +119,25 @@ function initSchema(database: Database): void {
 
   database.run(`
     CREATE TABLE IF NOT EXISTS admins (
-      id            TEXT PRIMARY KEY,
-      username      TEXT NOT NULL UNIQUE,
-      password_hash TEXT NOT NULL,
-      display_name  TEXT NOT NULL DEFAULT '',
-      role          TEXT NOT NULL DEFAULT 'admin',
-      created_at    TEXT NOT NULL,
-      last_login_at TEXT,
-      is_active     INTEGER NOT NULL DEFAULT 1
+      id                  TEXT PRIMARY KEY,
+      username            TEXT NOT NULL UNIQUE,
+      password_hash       TEXT NOT NULL,
+      display_name        TEXT NOT NULL DEFAULT '',
+      role                TEXT NOT NULL DEFAULT 'admin',
+      created_at          TEXT NOT NULL,
+      last_login_at       TEXT,
+      is_active           INTEGER NOT NULL DEFAULT 1,
+      must_change_password INTEGER NOT NULL DEFAULT 0
     )
   `)
   database.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_admins_username ON admins(username)')
+
+  // 兼容已有数据库：为 admins 表新增 must_change_password 列
+  try {
+    database.run('ALTER TABLE admins ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0')
+  } catch {
+    // 列已存在时静默忽略（SQLite 不支持 IF NOT EXISTS for ALTER TABLE）
+  }
 
   // 兼容已有数据库：为 reading_logs 新增 user_id 列
   try {

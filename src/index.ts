@@ -4,8 +4,7 @@ import { fileURLToPath } from 'url'
 import express, { type Request, type Response, type NextFunction } from 'express'
 import { config, configMeta, updateConfig, maskSensitiveValue, getConfigDefaults } from './config.js'
 import { corsMiddleware } from './middleware/cors.js'
-import { authMiddleware } from './middleware/auth.js'
-import { adminCompatMiddleware } from './middleware/admin-compat.js'
+import { adminAuthMiddleware } from './middleware/admin-auth.js'
 import { jwtAuthMiddleware } from './middleware/jwt-auth.js'
 import { rateLimitMiddleware } from './middleware/rate-limit.js'
 import { loggingMiddleware } from './gateway/logging.js'
@@ -29,7 +28,7 @@ import { bindEmailHandler } from './auth/bind-email.js'
 import { bindPhoneHandler } from './auth/bind-phone.js'
 import { updateProfileHandler } from './auth/update-profile.js'
 import { getUserRecords, getRecordById, saveRecord, deleteRecord } from './db/reading-record.js'
-import { findAdminByUsername, updateLastLogin, initAdminIfNeeded } from './db/admin.js'
+import { findAdminByUsername, updateLastLogin, initAdminIfNeeded, findAdminById, changePassword } from './db/admin.js'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
 import type { PosterData } from './poster/types.js'
@@ -71,6 +70,17 @@ app.get('/', (_req, res) => {
         records: 'GET /api/user/records',
         recordById: 'GET /api/user/records/:id',
         deleteRecord: 'DELETE /api/user/records/:id',
+      },
+      admin: {
+        login: 'POST /admin/auth/login',
+        logout: 'POST /admin/auth/logout',
+        me: 'GET /admin/auth/me',
+        changePassword: 'POST /admin/auth/change-password',
+        logs: 'GET /api/logs',
+        logById: 'GET /api/logs/:id',
+        users: 'GET /api/admin/users',
+        config: 'GET /api/config',
+        updateConfig: 'PUT /api/config/:key',
       },
     },
   })
@@ -217,6 +227,7 @@ app.post('/admin/auth/login', async (req, res) => {
         displayName: admin.display_name,
         role: admin.role,
       },
+      mustChangePassword: admin.must_change_password === 1,
     })
   } catch (err) {
     log.error({ err }, 'Admin login failed')
@@ -225,17 +236,53 @@ app.post('/admin/auth/login', async (req, res) => {
 })
 
 // Admin 登出（纯前端清除 token，后端无状态）
-app.post('/admin/auth/logout', adminCompatMiddleware, (_req, res) => {
+app.post('/admin/auth/logout', adminAuthMiddleware, (_req, res) => {
   res.json({ message: '已退出登录' })
 })
 
-// 获取当前 Admin 信息
-app.get('/admin/auth/me', adminCompatMiddleware, (req, res) => {
-  res.json({
-    id: (req as any).adminId || '',
-    username: (req as any).adminUsername || '',
-    role: (req as any).adminRole || '',
-  })
+// 获取当前 Admin 信息（查 DB，返回完整字段）
+app.get('/admin/auth/me', adminAuthMiddleware, async (req, res) => {
+  try {
+    const adminId = (req as any).adminId as string
+    const admin = await findAdminById(adminId)
+    if (!admin || admin.is_active !== 1) {
+      res.status(401).json({ error: 'UNAUTHORIZED', message: '账号不存在或已禁用' })
+      return
+    }
+    res.json({
+      id: admin.id,
+      username: admin.username,
+      displayName: admin.display_name,
+      role: admin.role,
+      mustChangePassword: admin.must_change_password === 1,
+    })
+  } catch (err) {
+    log.error({ err }, 'Failed to get admin info')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '服务器内部错误' })
+  }
+})
+
+// 修改密码
+app.post('/admin/auth/change-password', adminAuthMiddleware, async (req, res) => {
+  const adminId = (req as any).adminId as string
+  const { oldPassword, newPassword } = req.body as { oldPassword?: string; newPassword?: string }
+
+  if (!oldPassword || !newPassword) {
+    res.status(400).json({ error: 'INVALID_INPUT', message: '旧密码和新密码为必填项' })
+    return
+  }
+
+  try {
+    const result = await changePassword(adminId, oldPassword, newPassword)
+    if (!result.success) {
+      res.status(400).json({ error: 'CHANGE_PASSWORD_FAILED', message: result.error })
+      return
+    }
+    res.json({ message: '密码修改成功，请使用新密码重新登录' })
+  } catch (err) {
+    log.error({ err }, 'Change password failed')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '服务器内部错误' })
+  }
 })
 
 // ========== 业务接口（JWT 鉴权 + 频率限制）==========
@@ -321,7 +368,7 @@ app.post('/api/poster', jwtAuthMiddleware, async (req, res) => {
   }
 })
 
-app.get('/api/logs', adminCompatMiddleware, async (req, res) => {
+app.get('/api/logs', adminAuthMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
   const target = req.query.target as string | undefined
@@ -329,7 +376,7 @@ app.get('/api/logs', adminCompatMiddleware, async (req, res) => {
   res.json(result)
 })
 
-app.get('/api/logs/:id', adminCompatMiddleware, async (req, res) => {
+app.get('/api/logs/:id', adminAuthMiddleware, async (req, res) => {
   const log = await getLogById(req.params.id)
   if (!log) {
     res.status(404).json({ error: 'Log not found' })
@@ -338,7 +385,7 @@ app.get('/api/logs/:id', adminCompatMiddleware, async (req, res) => {
   res.json(log)
 })
 
-app.get('/api/admin/users', adminCompatMiddleware, async (req, res) => {
+app.get('/api/admin/users', adminAuthMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1
   const limit = Math.min(parseInt(req.query.limit as string) || 20, 100)
   const keyword = req.query.keyword as string | undefined
@@ -429,7 +476,7 @@ app.get('/api/config', async (_req, res) => {
   res.json({ groups: Array.from(groups.entries()).map(([name, items]) => ({ name, items })) })
 })
 
-app.put('/api/config/:key', adminCompatMiddleware, async (req, res) => {
+app.put('/api/config/:key', adminAuthMiddleware, async (req, res) => {
   const { key } = req.params
   const { value } = req.body as { value: string }
 
@@ -497,7 +544,7 @@ async function start(): Promise<void> {
     log.info({ restored }, 'Restored user config from database')
   }
 
-  // 初始化管理员账号（首次部署时）
+  // 初始化管理员账号（首次部署时，默认 admin / admin@123456）
   await initAdminIfNeeded()
 
   // 输出配置来源分组（from_env / from_default / from_user）
@@ -531,10 +578,10 @@ async function start(): Promise<void> {
       timezone: config.timezone,
       logLevel: process.env.LOG_LEVEL || (config.nodeEnv === 'development' ? 'debug' : 'info'),
       geminiKey: config.geminiApiKey ? '***configured***' : 'NOT SET',
-      apiKey: config.apiKey ? '***configured***' : 'NOT SET',
       wechatAppId: config.wechatAppId ? '***configured***' : 'NOT SET',
       wechatSecret: config.wechatSecret ? '***configured***' : 'NOT SET',
       jwtSecret: config.jwtSecret ? '***configured***' : 'NOT SET',
+      adminDefaultAccount: config.adminInitUsername ? `${config.adminInitUsername} / ***` : 'NOT SET',
       corsOrigin: config.corsOrigin,
       restoredUserConfig: restored.length > 0 ? restored : undefined,
       cacheMaxSize: config.cache.maxSize,
