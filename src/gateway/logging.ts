@@ -5,10 +5,10 @@ import { getLogger } from '../logger.js'
 
 const log = getLogger('gateway')
 
-const SKIP_PATHS = ['/', '/health', '/metrics', '/logs']
+const SKIP_PATHS = ['/', '/api/health', '/api/metrics', '/api/logs']
 
 export function loggingMiddleware(req: Request, res: Response, next: NextFunction): void {
-  if (SKIP_PATHS.includes(req.path) || req.path.startsWith('/logs/')) {
+  if (SKIP_PATHS.includes(req.path) || req.path.startsWith('/api/logs/')) {
     next()
     return
   }
@@ -16,7 +16,7 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
   const start = Date.now()
   const logId = crypto.randomUUID()
   const requestBody = req.body || {}
-  const target = req.path === '/reading' ? 'reading' : req.path === '/poster' ? 'poster' : 'other'
+  const target = req.path === '/api/reading' ? 'reading' : req.path === '/api/poster' ? 'poster' : 'other'
   const ip = req.ip || req.socket.remoteAddress || ''
 
   // 将 logId 注入到 req，供下游 handler 串联日志
