@@ -17,6 +17,11 @@ export interface LogEntry {
   is_error: number | null
   error_msg: string | null
   user_id: string | null
+  // 来自 users 表的 JOIN 字段
+  user_nickname: string | null
+  user_email: string | null
+  user_avatar: string | null
+  login_type: string | null // 'wechat' | 'email' | 'wechat+email' | 'anonymous'
 }
 
 export interface LogQueryResult {
@@ -72,11 +77,30 @@ export async function insertLog(params: InsertLogParams): Promise<void> {
   saveDb()
 }
 
+function maskEmail(email: string | null): string | null {
+  if (!email) return null
+  const [local, domain] = email.split('@')
+  if (!domain) return email
+  const visible = local.length > 1 ? local[0] + '***' : '***'
+  return visible + '@' + domain
+}
+
 export async function queryLogs(page: number = 1, limit: number = 50, target?: string): Promise<LogQueryResult> {
   const db = await getDb()
 
   let countSql = 'SELECT COUNT(*) as cnt FROM reading_logs'
-  let querySql = 'SELECT * FROM reading_logs'
+  let querySql = `SELECT l.*,
+    u.nickname   AS user_nickname,
+    u.email      AS user_email,
+    u.avatar_url AS user_avatar,
+    CASE
+      WHEN u.openid != '' AND u.email IS NOT NULL THEN 'wechat+email'
+      WHEN u.openid != '' THEN 'wechat'
+      WHEN u.email IS NOT NULL THEN 'email'
+      ELSE 'anonymous'
+    END AS login_type
+  FROM reading_logs l
+  LEFT JOIN users u ON l.user_id = u.id`
   const where: string[] = []
   const params: any[] = []
 
@@ -104,7 +128,9 @@ export async function queryLogs(page: number = 1, limit: number = 50, target?: s
   stmt.bind(queryParams)
   const rows: LogEntry[] = []
   while (stmt.step()) {
-    rows.push(stmt.getAsObject() as unknown as LogEntry)
+    const row = stmt.getAsObject() as unknown as LogEntry
+    row.user_email = maskEmail(row.user_email)
+    rows.push(row)
   }
   stmt.free()
 
@@ -113,11 +139,24 @@ export async function queryLogs(page: number = 1, limit: number = 50, target?: s
 
 export async function getLogById(id: string): Promise<LogEntry | undefined> {
   const db = await getDb()
-  const stmt = db.prepare('SELECT * FROM reading_logs WHERE id = ?')
+  const stmt = db.prepare(`SELECT l.*,
+    u.nickname   AS user_nickname,
+    u.email      AS user_email,
+    u.avatar_url AS user_avatar,
+    CASE
+      WHEN u.openid != '' AND u.email IS NOT NULL THEN 'wechat+email'
+      WHEN u.openid != '' THEN 'wechat'
+      WHEN u.email IS NOT NULL THEN 'email'
+      ELSE 'anonymous'
+    END AS login_type
+  FROM reading_logs l
+  LEFT JOIN users u ON l.user_id = u.id
+  WHERE l.id = ?`)
   stmt.bind([id])
   let row: LogEntry | undefined
   if (stmt.step()) {
     row = stmt.getAsObject() as unknown as LogEntry
+    row.user_email = maskEmail(row.user_email)
   }
   stmt.free()
   return row

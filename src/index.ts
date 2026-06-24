@@ -233,7 +233,7 @@ app.post('/poster', jwtAuthMiddleware, async (req, res) => {
   }
 })
 
-app.get('/logs', async (req, res) => {
+app.get('/logs', authMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
   const target = req.query.target as string | undefined
@@ -241,7 +241,7 @@ app.get('/logs', async (req, res) => {
   res.json(result)
 })
 
-app.get('/logs/:id', async (req, res) => {
+app.get('/logs/:id', authMiddleware, async (req, res) => {
   const log = await getLogById(req.params.id)
   if (!log) {
     res.status(404).json({ error: 'Log not found' })
