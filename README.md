@@ -248,6 +248,8 @@ curl "http://localhost:3000/health?noCache=1"
 |------|------|--------|:----:|
 | `PORT` | 服务端口 | `3000`（HF: `7860`） | |
 | `NODE_ENV` | 运行环境 | `development` | |
+| `TZ` | 时区 | `Asia/Shanghai` | |
+| `LOG_LEVEL` | 日志级别（trace/debug/info/warn/error/fatal） | `info` | |
 | `GEMINI_API_KEY` | Google Gemini API 密钥 | — | **✅** |
 | `API_KEY` | API 鉴权密钥（Bearer Token） | 空（不鉴权） | |
 | `CORS_ORIGIN` | 跨域允许来源 | `*` | |
@@ -259,9 +261,16 @@ curl "http://localhost:3000/health?noCache=1"
 | `CACHE_TTL_SECONDS` | 缓存 TTL（秒） | `3600` | |
 | `POOL_MAX_PAGES` | 浏览器 Page 池大小 | `4` | |
 | `POOL_ACQUIRE_TIMEOUT_MS` | 获取 Page 超时（ms） | `30000` | |
+| `WECHAT_APPID` | 微信小程序 AppID | — | |
+| `WECHAT_SECRET` | 微信小程序 AppSecret（敏感） | — | |
+| `JWT_SECRET` | JWT 签名密钥（敏感） | — | |
+| `ADMIN_JWT_EXPIRES_IN` | 管理员 JWT 过期时间 | `24h` | |
+| `ADMIN_INIT_USERNAME` | 初始管理员账号 | `admin` | |
+| `ADMIN_INIT_PASSWORD` | 初始管理员密码（首次登录须修改） | `admin@123456` | |
 
 > `GEMINI_API_KEY` 是唯一必填变量，其余均有合理默认值。
 > Docker 部署时 `PUPPETEER_EXECUTABLE_PATH` 和 `PUPPETEER_ARGS` 已在 Dockerfile 中硬编码。
+> 微信登录相关变量（`WECHAT_*`、`JWT_SECRET`）启用小程序登录功能时建议配置。
 
 ### 配置持久化
 
