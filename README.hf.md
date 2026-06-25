@@ -9,9 +9,6 @@ env:
   - name: GEMINI_API_KEY
     value: ""
     required: true
-  - name: API_KEY
-    value: ""
-    required: false
 ---
 
 ## 塔罗牌统一后台服务
@@ -34,4 +31,3 @@ env:
 | 变量 | 用途 | 必填 |
 |------|------|:----:|
 | `GEMINI_API_KEY` | Google Gemini API 密钥 | **✅** |
-| `API_KEY` | API 鉴权密钥 | |

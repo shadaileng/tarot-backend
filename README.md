@@ -251,7 +251,6 @@ curl "http://localhost:3000/health?noCache=1"
 | `TZ` | 基础服务 | 时区 | `Asia/Shanghai` | |
 | `LOG_LEVEL` | 基础服务 | 日志级别（trace/debug/info/warn/error/fatal） | `info` | |
 | `GEMINI_API_KEY` | AI 解读 | Google Gemini API 密钥 | — | **✅** |
-| `API_KEY` | 安全鉴权 | API 鉴权密钥（Bearer Token） | 空（不鉴权） | |
 | `CORS_ORIGIN` | 安全鉴权 | 跨域允许来源 | `*` | |
 | `DB_PATH` | 数据存储 | SQLite 数据库文件路径 | `./data/tarot.db` | |
 | `LOG_RETENTION_DAYS` | 数据存储 | 日志保留天数 | `30` | |
@@ -358,7 +357,6 @@ curl "http://localhost:3000/health?noCache=1"
 docker build -t tarot-backend .
 docker run -d -p 3000:3000 \
   -e GEMINI_API_KEY=your-key \
-  -e API_KEY=optional-auth-key \
   tarot-backend
 ```
 
@@ -376,7 +374,6 @@ docker run -p 7860:7860 \
 | 变量 | 建议 |
 |------|------|
 | `GEMINI_API_KEY` | 🔴 必填，设为 Secret |
-| `API_KEY` | 🟡 建议设置，保护 `/poster` 端点 |
 
 > HF Spaces 平台已自动设置 `PORT=7860`，不要在 Variables 中手动设置。
 

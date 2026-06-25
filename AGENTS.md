@@ -286,7 +286,6 @@ curl "http://localhost:3000/health?noCache=1"
 | `TZ` | 基础服务 | 时区 | `Asia/Shanghai` | |
 | `LOG_LEVEL` | 基础服务 | 日志级别（trace/debug/info/warn/error/fatal） | `info` | |
 | `GEMINI_API_KEY` | AI 解读 | Gemini API 密钥 | — | **✅** |
-| `API_KEY` | 安全鉴权 | API 鉴权密钥 | 空（不鉴权） | |
 | `CORS_ORIGIN` | 安全鉴权 | CORS 来源 | `*` | |
 | `DB_PATH` | 数据存储 | SQLite 路径 | `./data/tarot.db` | |
 | `LOG_RETENTION_DAYS` | 数据存储 | 日志保留天数 | `30` | |
@@ -313,7 +312,6 @@ curl "http://localhost:3000/health?noCache=1"
 | `PORT` | `3000`（可自定义） | `3000` | **`7860`**（平台固定） |
 | 启动方式 | `tsx watch`（热重载） | `node dist/index.js` | `node dist/index.js` |
 | `PUPPETEER_EXECUTABLE_PATH` | 不设置 | `/usr/bin/chromium` | `/usr/bin/chromium` |
-| `API_KEY` | 通常留空 | ✅ 建议设置 | ✅ 建议设置 |
 | 日志 | pino-pretty 美化 | JSON 纯文本 | JSON 纯文本 |
 
 ## 数据库
