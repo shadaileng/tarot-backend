@@ -1,10 +1,9 @@
-/* 本地字体声明，替代 Google Fonts CDN */
+/* 本地字体声明（仅 local()，不依赖 file:// — Puppeteer sandbox 禁止 file:// 协议） */
 @font-face {
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 400;
-  src: local('Noto Serif CJK SC'), local('Noto Serif SC'),
-       url('file:///usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc') format('truetype');
+  src: local('Noto Serif CJK SC'), local('Noto Serif SC');
   font-display: block;
 }
 
@@ -12,8 +11,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 600;
-  src: local('Noto Serif CJK SC Bold'), local('Noto Serif SC Bold'),
-       url('file:///usr/share/fonts/opentype/noto/NotoSerifCJK-Bold.ttc') format('truetype');
+  src: local('Noto Serif CJK SC Bold'), local('Noto Serif SC Bold');
   font-display: block;
 }
 
@@ -21,8 +19,7 @@
   font-family: 'Noto Serif SC';
   font-style: normal;
   font-weight: 700;
-  src: local('Noto Serif CJK SC Bold'), local('Noto Serif SC Bold'),
-       url('file:///usr/share/fonts/opentype/noto/NotoSerifCJK-Bold.ttc') format('truetype');
+  src: local('Noto Serif CJK SC Bold'), local('Noto Serif SC Bold');
   font-display: block;
 }
 

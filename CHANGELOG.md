@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.2] - 2026-06-25
+
+### Fixed
+
+- 修复 Puppeteer 渲染超时（`Runtime.callFunctionOn timed out`）：去掉 CSS 中 `file://` 字体路径，避免 sandbox 策略拦截导致 `document.fonts.ready` 永不 resolve
+- Puppeteer 启动参数新增 `--allow-file-access-from-files` 和 `--disable-web-security`，兜底允许本地资源加载
+- `protocolTimeout` 显设置为 30s，避免 CDP 调用卡住 180s 才报错
+- `renderPoster` 失败日志增加 `isProtocolTimeout` 标记和诊断提示，方便排障
+
 ## [2.3.1] - 2026-06-24
 
 ### Fixed

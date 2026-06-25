@@ -65,7 +65,8 @@ async function getBrowser(): Promise<Browser> {
   browserPromise = puppeteer.launch({
     headless: true,
     executablePath: config.puppeteer.executablePath,
-    args: config.puppeteer.args,
+    args: [...config.puppeteer.args, '--allow-file-access-from-files', '--disable-web-security'],
+    protocolTimeout: 30000,
   })
 
   // ③ 注册 disconnected 事件监听（主动感知崩溃）
@@ -233,7 +234,11 @@ export async function renderPoster(html: string, width?: number): Promise<{ buff
     return { buffer: Buffer.from(screenshot), timings }
   } catch (error) {
     // ========== 错误诊断抓取 ==========
-    log.error({ err: error }, 'renderPoster failed')
+    log.error({
+      err: error,
+      isProtocolTimeout: error instanceof Error && /callFunctionOn|protocolTimeout/i.test(error.message),
+      hint: '可能原因：file:// 字体加载被拦截、img 死链、document.fonts.ready hang',
+    }, 'renderPoster failed')
 
     let diagnosticHtml: string | null = null
     let failureScreenshotPath: string | null = null
