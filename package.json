@@ -1,6 +1,6 @@
 {
   "name": "tarot-backend",
-  "version": "2.3.2",
+  "version": "2.3.3",
   "description": "塔罗牌后台服务 - AI 解读 + 海报生成",
   "private": true,
   "packageManager": "pnpm@9.15.0",
@@ -26,6 +26,7 @@
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/ms": "^2.1.0",
     "@types/node": "^20.14.0",
     "@types/sql.js": "^1.4.11",
     "@types/uuid": "^11.0.0",

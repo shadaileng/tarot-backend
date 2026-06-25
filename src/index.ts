@@ -220,7 +220,7 @@ app.post('/admin/auth/login', async (req, res) => {
     const token = jwt.sign(
       { sub: admin.id, username: admin.username, role: admin.role, type: 'admin' },
       secret,
-      { expiresIn: config.adminJwtExpiresIn || '24h' },
+      { expiresIn: (config.adminJwtExpiresIn || '24h') as import('ms').StringValue },
     )
 
     res.json({
