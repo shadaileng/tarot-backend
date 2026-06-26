@@ -23,6 +23,7 @@ export const configMeta: ConfigMeta[] = [
 
   { key: 'POOL_MAX_PAGES', envKey: 'POOL_MAX_PAGES', group: '性能配置', editable: true, type: 'number', defaultValue: '4' },
   { key: 'POOL_ACQUIRE_TIMEOUT_MS', envKey: 'POOL_ACQUIRE_TIMEOUT_MS', group: '性能配置', editable: true, type: 'number', defaultValue: '30000' },
+  { key: 'PUPPETEER_PROTOCOL_TIMEOUT', envKey: 'PUPPETEER_PROTOCOL_TIMEOUT', group: '性能配置', editable: true, type: 'number', defaultValue: '60000' },
 
   { key: 'LOG_RETENTION_DAYS', envKey: 'LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '30' },
 
@@ -51,7 +52,8 @@ export const config = {
 
   puppeteer: {
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    args: (process.env.PUPPETEER_ARGS || '--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage').split(','),
+    args: (process.env.PUPPETEER_ARGS || '--no-sandbox,--disable-setuid-sandbox').split(','),
+    protocolTimeout: parseInt(process.env.PUPPETEER_PROTOCOL_TIMEOUT || '60000', 10),
   },
 
   cache: {
@@ -124,6 +126,9 @@ export function updateConfig(key: string, value: string): void {
       break
     case 'LOG_RETENTION_DAYS':
       config.db.retentionDays = parseInt(value, 10)
+      break
+    case 'PUPPETEER_PROTOCOL_TIMEOUT':
+      config.puppeteer.protocolTimeout = parseInt(value, 10)
       break
     case 'ADMIN_JWT_EXPIRES_IN':
       config.adminJwtExpiresIn = value

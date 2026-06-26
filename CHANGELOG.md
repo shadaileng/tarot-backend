@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.4] - 2026-06-26
+
+### Fixed
+
+- 修复 Puppeteer 海报渲染 `Runtime.callFunctionOn timed out` 超时问题：`protocolTimeout` 从硬编码 30s 改为可配置环境变量 `PUPPETEER_PROTOCOL_TIMEOUT`（默认 60s），支持运行时动态调整
+- `img.decode()` 添加 5s 超时保护，避免 headless Chromium 下 SVG data URI 解码永久 hang
+
+### Added
+
+- `page.evaluate()` 内添加 `[timing]` 逐阶段 `console.log` 计时（`img-count`、`img-wait`、`decode`、`fonts`），自动被诊断日志收集，精确定位渲染卡点
+- `insertLog` 增加成功/失败诊断日志（`insertLog OK` / `insertLog FAILED`），排查 reading 日志未入库问题
+- 新增 `PUPPETEER_PROTOCOL_TIMEOUT` 配置项，可通过环境变量或 `PUT /api/config/PUPPETEER_PROTOCOL_TIMEOUT` 动态调整
+
 ## [2.3.3] - 2026-06-25
 
 ### Fixed

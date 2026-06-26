@@ -78,8 +78,10 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
       is_error: isError,
       error_msg: errorMsg,
       user_id: userId,
+    }).then(() => {
+      log.info({ logId, target, userId }, 'insertLog OK')
     }).catch((err) => {
-      log.error({ err, logId }, 'Failed to insert log')
+      log.error({ err, logId, target, userId, statusCode: res.statusCode }, 'insertLog FAILED')
     })
   }
 

@@ -66,7 +66,7 @@ async function getBrowser(): Promise<Browser> {
     headless: true,
     executablePath: config.puppeteer.executablePath,
     args: [...config.puppeteer.args, '--allow-file-access-from-files', '--disable-web-security'],
-    protocolTimeout: 30000,
+    protocolTimeout: config.puppeteer.protocolTimeout,
   })
 
   // ③ 注册 disconnected 事件监听（主动感知崩溃）
@@ -132,6 +132,13 @@ export async function renderPoster(html: string, width?: number): Promise<{ buff
   const browser = await getBrowser()
   const pool = await getBrowserPool(browser)
   const page = await pool.acquire()
+  log.info({ acquireMs: Date.now() - renderStart }, 'pool.acquire done')
+
+  // ========== 内存诊断 ==========
+  try {
+    const mem = process.memoryUsage()
+    log.info({ rssMB: (mem.rss / 1048576).toFixed(1), heapUsedMB: (mem.heapUsed / 1048576).toFixed(1) }, 'Memory before render')
+  } catch {}
 
   // ========== 诊断日志收集 ==========
   const consoleLogs: { type: string; text: string }[] = []
@@ -157,51 +164,65 @@ export async function renderPoster(html: string, width?: number): Promise<{ buff
 
     // 阶段 1：加载 HTML（使用 'domcontentloaded'，后续有独立的资源就绪检查）
     const setContentStart = Date.now()
+    log.info({ htmlLength: html.length }, 'setContent start')
     await page.setContent(html, {
       waitUntil: 'domcontentloaded',
       timeout: 30000,
     })
     const setContentMs = Date.now() - setContentStart
+    log.info({ setContentMs }, 'setContent done')
 
     // 阶段 2：增强资源就绪检查
     const resourceStart = Date.now()
     // ① 等待所有 <img> complete 且 naturalWidth > 0
-    // ② 执行 img.decode() 强制 GPU 纹理上传
+    // ② 执行 img.decode() 强制 GPU 纹理上传（带超时保护）
     // ③ 等待 document.fonts.ready（字体渲染完成）
     await page.evaluate(async () => {
+      const t0 = performance.now()
+
       const images = Array.from(document.querySelectorAll('img'))
+      console.log('[timing] img-count=' + images.length)
 
       // ① 等待所有图片加载完成
       await Promise.all(
         images.map((img) => {
           if (img.complete && img.naturalWidth > 0) return Promise.resolve()
           return new Promise<void>((resolve) => {
-            const timeout = setTimeout(() => resolve(), 8000)
+            const timeout = setTimeout(() => resolve(), 5000)
             const cleanup = () => { clearTimeout(timeout); resolve() }
             img.addEventListener('load', cleanup, { once: true })
             img.addEventListener('error', cleanup, { once: true })
           })
         })
       )
+      console.log('[timing] img-wait=' + (performance.now() - t0).toFixed(0) + 'ms')
 
-      // ② 执行 img.decode() 强制 GPU 纹理上传
+      // ② 执行 img.decode() 强制 GPU 纹理上传（每张图 5s 超时保护）
       await Promise.all(
         images.map((img) => {
-          if ((img as HTMLImageElement & { decode?: () => Promise<void> }).decode) {
-            return (img as HTMLImageElement & { decode?: () => Promise<void> }).decode!().catch(() => {})
+          if (!(img as HTMLImageElement & { decode?: () => Promise<void> }).decode) {
+            return Promise.resolve()
           }
-          return Promise.resolve()
+          return new Promise<void>((resolve) => {
+            const timer = setTimeout(resolve, 5000)
+            ;(img as HTMLImageElement).decode!().then(
+              () => { clearTimeout(timer); resolve() },
+              () => { clearTimeout(timer); resolve() },
+            )
+          })
         })
       )
+      console.log('[timing] decode=' + (performance.now() - t0).toFixed(0) + 'ms')
 
       // ③ 等待字体就绪（最多 5s，超时渲染继续）
       if (document.fonts && document.fonts.ready) {
-        (window as any).__fontTimedOut = false
+        ;(window as any).__fontTimedOut = false
         const fontTimeout = new Promise<void>((resolve) => {
           setTimeout(() => { (window as any).__fontTimedOut = true; resolve() }, 5000)
         })
         await Promise.race([document.fonts.ready, fontTimeout])
       }
+      console.log('[timing] fonts=' + (performance.now() - t0).toFixed(0) + 'ms')
     })
     const resourceMs = Date.now() - resourceStart
 
