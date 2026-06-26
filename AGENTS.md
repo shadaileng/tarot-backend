@@ -69,7 +69,9 @@ tarot-backend/
 │   │
 │   ├── middleware/              # ◆ 复制自 poster-service
 │   │   ├── cors.ts              # CORS 中间件
-│   │   └── auth.ts              # Bearer Token 鉴权（可选）
+│   │   ├── jwt-auth.ts           # JWT 鉴权（用户端）
+│   │   ├── admin-auth.ts         # Admin JWT 鉴权（管理端）
+│   │   └── rate-limit.ts         # 频率限制
 │   │
 │   ├── cache/                   # ◆ 复制自 poster-service
 │   │   └── index.ts             # LRU 内存缓存（SHA256 键 + TTL）
@@ -224,7 +226,7 @@ interface ReadingRequestBody {
 |-------------|------------|------|
 | `up` | 200 | Gemini API 可用，有可用模型 |
 | `quota_exhausted` | 200 | API 可用，但今日所有模型配额已耗尽 |
-| `down` | 200 | API Key 无效、网络不可达或服务不可用 |
+| `down` | 200 | Gemini API Key 无效、网络不可达或服务不可用 |
 | `unconfigured` | 500 | 未配置 `GEMINI_API_KEY` |
 
 **示例响应**（正常）：
