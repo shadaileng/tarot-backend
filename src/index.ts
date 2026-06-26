@@ -550,6 +550,7 @@ app.post('/api/poster', jwtAuthMiddleware, async (req, res) => {
 
       res.set('Content-Type', 'image/png')
       res.set('X-Cache', 'HIT')
+      res.set('X-Cache-Key', cacheKey)
       res.set('Cache-Control', 'public, max-age=3600')
       res.send(cached)
 
@@ -596,6 +597,7 @@ app.post('/api/poster', jwtAuthMiddleware, async (req, res) => {
 
     res.set('Content-Type', 'image/png')
     res.set('X-Cache', 'MISS')
+    res.set('X-Cache-Key', cacheKey)
     res.set('X-Render-Template-Ms', String(templateMs))
     res.set('X-Render-Resource-Ms', String(timings.resourceMs))
     res.set('X-Render-Screenshot-Ms', String(timings.screenshotMs))
@@ -607,6 +609,19 @@ app.post('/api/poster', jwtAuthMiddleware, async (req, res) => {
     requestLogger.error({ err: error }, 'Poster generation failed')
     res.status(500).json({ error: 'Poster generation failed' })
   }
+})
+
+app.get('/api/poster/:cacheKey', jwtAuthMiddleware, async (req, res) => {
+  const { cacheKey } = req.params
+  const cached = posterCache.get(cacheKey)
+  if (!cached) {
+    res.status(404).json({ error: 'Poster not found or expired' })
+    return
+  }
+  res.set('Content-Type', 'image/png')
+  res.set('X-Cache', 'HIT')
+  res.set('Cache-Control', 'public, max-age=3600')
+  res.send(cached)
 })
 
 app.get('/api/logs', adminAuthMiddleware, async (req, res) => {
@@ -767,6 +782,10 @@ app.put('/api/config/:key', adminAuthMiddleware, async (req, res) => {
     }
   }
 
+  if (key === 'HTTPS_PROXY') {
+    log.info({ proxy: value ? '***configured***' : '(none)' }, 'HTTPS_PROXY config updated')
+  }
+
   log.info({ key, value: meta.sensitive ? '***' : stringValue }, 'Config updated')
 
   res.json({ key, value: meta.sensitive ? maskSensitiveValue(key, stringValue) : stringValue, source: 'user' })
@@ -830,6 +849,7 @@ async function start(): Promise<void> {
       jwtSecret: config.jwtSecret ? '***configured***' : 'NOT SET',
       adminDefaultAccount: config.adminInitUsername ? `${config.adminInitUsername} / ***` : 'NOT SET',
       corsOrigin: config.corsOrigin,
+      httpsProxy: config.httpsProxy ? '***configured***' : '(none)',
       restoredUserConfig: restored.length > 0 ? restored : undefined,
       cacheMaxSize: config.cache.maxSize,
       cacheTtlSeconds: config.cache.ttlSeconds,
