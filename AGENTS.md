@@ -300,11 +300,13 @@ curl "http://localhost:3000/health?noCache=1"
 | `WECHAT_APPID` | 微信认证 | 微信小程序 AppID | — | ⚠️ ¹ |
 | `WECHAT_SECRET` | 微信认证 | 微信小程序 AppSecret（敏感） | — | ⚠️ ¹ |
 | `JWT_SECRET` | 管理认证 | JWT 签名密钥（敏感） | — | ⚠️ ¹ |
-| `ADMIN_JWT_EXPIRES_IN` | 管理认证 | 管理员 JWT 过期时间 | `24h` | |
+| `ADMIN_ACCESS_EXPIRES_IN` | 管理认证 | 管理员 Access Token 过期时间 | `2h` | |
+| `ADMIN_REFRESH_EXPIRES_IN` | 管理认证 | 管理员 Refresh Token 过期时间 | `30d` | |
 | `ADMIN_INIT_USERNAME` | 管理认证 | 初始管理员账号 | `admin` | |
 | `ADMIN_INIT_PASSWORD` | 管理认证 | 初始管理员密码（首次登录须修改） | `admin@123456` | |
 
 > ¹ 启用微信小程序登录 / 管理后台时必填，纯 API 调用模式可跳过。
+> 过期时间格式（`ms` 库）：`30m`（30分钟）、`2h`（2小时）、`7d`（7天）、`30d`（30天）。
 
 ### 生产/开发关键差异
 

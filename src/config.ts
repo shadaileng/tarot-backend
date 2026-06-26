@@ -31,7 +31,8 @@ export const configMeta: ConfigMeta[] = [
   { key: 'WECHAT_SECRET', envKey: 'WECHAT_SECRET', group: '微信配置', editable: false, sensitive: true,  type: 'string', defaultValue: '' },
   { key: 'JWT_SECRET',    envKey: 'JWT_SECRET',    group: '安全配置', editable: false, sensitive: true,  type: 'string', defaultValue: '' },
 
-  { key: 'ADMIN_JWT_EXPIRES_IN', envKey: 'ADMIN_JWT_EXPIRES_IN', group: '安全配置', editable: true,  type: 'string', defaultValue: '24h' },
+  { key: 'ADMIN_ACCESS_EXPIRES_IN', envKey: 'ADMIN_ACCESS_EXPIRES_IN', group: '安全配置', editable: true, type: 'string', defaultValue: '2h' },
+  { key: 'ADMIN_REFRESH_EXPIRES_IN', envKey: 'ADMIN_REFRESH_EXPIRES_IN', group: '安全配置', editable: true, type: 'string', defaultValue: '30d' },
   { key: 'ADMIN_INIT_USERNAME',  envKey: 'ADMIN_INIT_USERNAME',  group: '安全配置', editable: false, sensitive: false, type: 'string', defaultValue: 'admin' },
   { key: 'ADMIN_INIT_PASSWORD',  envKey: 'ADMIN_INIT_PASSWORD',  group: '安全配置', editable: false, sensitive: true, type: 'string', defaultValue: 'admin@123456' },
 ]
@@ -71,7 +72,8 @@ export const config = {
     retentionDays: parseInt(process.env.LOG_RETENTION_DAYS || '30', 10),
   },
 
-  adminJwtExpiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '24h',
+  adminAccessExpiresIn: process.env.ADMIN_ACCESS_EXPIRES_IN || '2h',
+  adminRefreshExpiresIn: process.env.ADMIN_REFRESH_EXPIRES_IN || '30d',
   adminInitUsername: process.env.ADMIN_INIT_USERNAME || 'admin',
   adminInitPassword: process.env.ADMIN_INIT_PASSWORD || 'admin@123456',
 }
@@ -130,8 +132,11 @@ export function updateConfig(key: string, value: string): void {
     case 'PUPPETEER_PROTOCOL_TIMEOUT':
       config.puppeteer.protocolTimeout = parseInt(value, 10)
       break
-    case 'ADMIN_JWT_EXPIRES_IN':
-      config.adminJwtExpiresIn = value
+    case 'ADMIN_ACCESS_EXPIRES_IN':
+      config.adminAccessExpiresIn = value
+      break
+    case 'ADMIN_REFRESH_EXPIRES_IN':
+      config.adminRefreshExpiresIn = value
       break
   }
 }

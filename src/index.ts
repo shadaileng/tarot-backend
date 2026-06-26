@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url'
 import express, { type Request, type Response, type NextFunction } from 'express'
 import { config, configMeta, updateConfig, maskSensitiveValue, getConfigDefaults } from './config.js'
 import { corsMiddleware } from './middleware/cors.js'
-import { adminAuthMiddleware } from './middleware/admin-auth.js'
+import { adminAuthMiddleware, type AdminJwtPayload } from './middleware/admin-auth.js'
 import { jwtAuthMiddleware } from './middleware/jwt-auth.js'
 import { rateLimitMiddleware } from './middleware/rate-limit.js'
 import { loggingMiddleware } from './gateway/logging.js'
@@ -217,14 +217,20 @@ app.post('/admin/auth/login', async (req, res) => {
     await updateLastLogin(admin.id)
 
     const secret = config.jwtSecret || 'dev-secret-do-not-use-in-production'
-    const token = jwt.sign(
-      { sub: admin.id, username: admin.username, role: admin.role, type: 'admin' },
+    const accessToken = jwt.sign(
+      { sub: admin.id, username: admin.username, role: admin.role, type: 'admin', tokenType: 'access' },
       secret,
-      { expiresIn: (config.adminJwtExpiresIn || '24h') as import('ms').StringValue },
+      { expiresIn: (config.adminAccessExpiresIn || '2h') as import('ms').StringValue },
+    )
+    const refreshToken = jwt.sign(
+      { sub: admin.id, type: 'admin', tokenType: 'refresh' },
+      secret,
+      { expiresIn: (config.adminRefreshExpiresIn || '30d') as import('ms').StringValue },
     )
 
     res.json({
-      token,
+      accessToken,
+      refreshToken,
       admin: {
         id: admin.id,
         username: admin.username,
@@ -242,6 +248,57 @@ app.post('/admin/auth/login', async (req, res) => {
 // Admin 登出（纯前端清除 token，后端无状态）
 app.post('/admin/auth/logout', adminAuthMiddleware, (_req, res) => {
   res.json({ message: '已退出登录' })
+})
+
+// Admin 刷新 Token（用 refreshToken 换取新 token 对）
+app.post('/admin/auth/refresh', async (req, res) => {
+  const { refreshToken } = req.body as { refreshToken?: string }
+
+  if (!refreshToken) {
+    res.status(400).json({ error: 'INVALID_INPUT', message: '缺少 refreshToken' })
+    return
+  }
+
+  const secret = config.jwtSecret || 'dev-secret-do-not-use-in-production'
+
+  try {
+    const decoded = jwt.verify(refreshToken, secret) as AdminJwtPayload
+
+    if (decoded.type !== 'admin' || decoded.tokenType !== 'refresh') {
+      res.status(401).json({ error: 'UNAUTHORIZED', message: '无效的 token' })
+      return
+    }
+
+    const admin = await findAdminById(decoded.sub)
+    if (!admin || admin.is_active !== 1) {
+      res.status(401).json({ error: 'UNAUTHORIZED', message: '账号不存在或已禁用' })
+      return
+    }
+
+    const newAccessToken = jwt.sign(
+      { sub: admin.id, username: admin.username, role: admin.role, type: 'admin', tokenType: 'access' },
+      secret,
+      { expiresIn: (config.adminAccessExpiresIn || '2h') as import('ms').StringValue },
+    )
+    const newRefreshToken = jwt.sign(
+      { sub: admin.id, type: 'admin', tokenType: 'refresh' },
+      secret,
+      { expiresIn: (config.adminRefreshExpiresIn || '30d') as import('ms').StringValue },
+    )
+
+    res.json({ accessToken: newAccessToken, refreshToken: newRefreshToken })
+  } catch (err) {
+    if (err instanceof jwt.TokenExpiredError) {
+      res.status(401).json({ error: 'REFRESH_EXPIRED', message: '登录已过期，请重新登录' })
+      return
+    }
+    if (err instanceof jwt.JsonWebTokenError) {
+      res.status(401).json({ error: 'UNAUTHORIZED', message: '无效的 token' })
+      return
+    }
+    log.error({ err }, 'Admin token refresh failed')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '服务器内部错误' })
+  }
 })
 
 // 获取当前 Admin 信息（查 DB，返回完整字段）

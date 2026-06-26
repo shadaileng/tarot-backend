@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-06-26
+
+### Added
+
+- 管理员双 Token 自动刷新认证：登录返回 accessToken（默认 2h）+ refreshToken（默认 30d），Access Token 过期后前端自动用 Refresh Token 刷新，用户无感知
+- 新增 POST /admin/auth/refresh 刷新端点，支持 refresh token rotation（每次刷新同时更换 refresh token）
+- 新增 ADMIN_ACCESS_EXPIRES_IN（默认 2h）和 ADMIN_REFRESH_EXPIRES_IN（默认 30d）可配置项，支持通过管理面板动态修改
+- 前端 401 拦截器：自动检测 TOKEN_EXPIRED 响应，触发 token 刷新并重试原请求，支持并发安全
+
+### Changed
+
+- 管理员 JWT 中间件验证 tokenType: access，业务接口只接受 access token
+- 登录接口返回字段从 token 改为 accessToken + refreshToken
+- 移除旧 ADMIN_JWT_EXPIRES_IN 配置项，替换为 ADMIN_ACCESS_EXPIRES_IN + ADMIN_REFRESH_EXPIRES_IN
+
 ## [2.3.4] - 2026-06-26
 
 ### Fixed
@@ -83,7 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 认证接口：`POST /admin/auth/login`（登录，失败限流 5次/min）、`POST /admin/auth/logout`、`GET /admin/auth/me`
 - `adminAuthMiddleware`（JWT 鉴权，验证 type=admin）与 `adminCompatMiddleware`（支持 api_key / jwt / dual 三种模式）
 - 首次启动时通过 `ADMIN_INIT_USERNAME` / `ADMIN_INIT_PASSWORD` 环境变量自动创建初始管理员
-- 可配置项：`ADMIN_AUTH_MODE`（api_key | jwt | dual）、`ADMIN_JWT_EXPIRES_IN`（默认 24h）
+- 可配置项：`ADMIN_AUTH_MODE`（api_key | jwt | dual）、`ADMIN_ACCESS_EXPIRES_IN`（默认 2h）、`ADMIN_REFRESH_EXPIRES_IN`（默认 30d）
 
 ### Changed
 

@@ -6,13 +6,14 @@ import { getLogger } from '../logger.js'
 const log = getLogger('Middleware:AdminAuth')
 
 export interface AdminJwtPayload {
-  sub: string      // admin.id
-  username: string
-  role: string     // 'admin' | 'readonly'
+  sub: string        // admin.id
+  username?: string  // access token 才有
+  role?: string      // access token 才有
   type: 'admin'
+  tokenType: 'access' | 'refresh'
 }
 
-/** Admin JWT 鉴权中间件 */
+/** Admin JWT 鉴权中间件（业务接口使用，只接受 access token） */
 export function adminAuthMiddleware(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization || ''
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
@@ -29,6 +30,11 @@ export function adminAuthMiddleware(req: Request, res: Response, next: NextFunct
 
     if (decoded.type !== 'admin') {
       res.status(403).json({ error: 'FORBIDDEN', message: '非管理员 token' })
+      return
+    }
+
+    if (decoded.tokenType !== 'access') {
+      res.status(401).json({ error: 'UNAUTHORIZED', message: '无效的 token' })
       return
     }
 
