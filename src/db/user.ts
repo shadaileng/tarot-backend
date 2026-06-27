@@ -95,7 +95,7 @@ export async function queryUsers(
   const offset = (page - 1) * limit
   const orderBy = deleted
     ? 'u.deleted_at DESC'
-    : 'COALESCE(u.last_request_at, u.last_login_at, u.created_at) DESC'
+    : 'COALESCE(last_request_at, u.last_login_at, u.created_at) DESC'
   const querySql = `
     SELECT
       u.id, u.openid, u.nickname, u.avatar_url, u.email, u.phone,
