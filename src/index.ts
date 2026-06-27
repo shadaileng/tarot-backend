@@ -32,6 +32,7 @@ import { getProfileHandler } from './auth/get-profile.js'
 import { checkinHandler, checkinStatusHandler } from './auth/checkin.js'
 import { getTasksHandler, claimTaskHandler } from './auth/tasks.js'
 import { getInviteCodeHandler, getInviteRecordsHandler } from './auth/invite.js'
+import { getUserStatsHandler, getLevelsHandler } from './auth/stats.js'
 import { getUserRecords, getRecordById, saveRecord, deleteRecord } from './db/reading-record.js'
 import {
   findAdminByUsername, updateLastLogin, initAdminIfNeeded, findAdminById, changePassword,
@@ -186,6 +187,12 @@ app.post('/api/tasks/:id/claim', jwtAuthMiddleware, claimTaskHandler)
 // 邀请（需要 JWT 鉴权）
 app.get('/api/invite/code', jwtAuthMiddleware, getInviteCodeHandler)
 app.get('/api/invite/records', jwtAuthMiddleware, getInviteRecordsHandler)
+
+// 统计（需要 JWT 鉴权）
+app.get('/api/user/stats', jwtAuthMiddleware, getUserStatsHandler)
+
+// 等级配置（公开）
+app.get('/api/levels', getLevelsHandler)
 
 // ========== Admin 认证路由 ==========
 
