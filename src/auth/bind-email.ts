@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express'
 import bcrypt from 'bcrypt'
-import { findById, findByEmail, bindEmail } from '../db/user.js'
+import { findById, findByEmail, bindEmail, mergeAccount } from '../db/user.js'
 import { getLogger } from '../logger.js'
 import type { BindEmailRequest } from '../types/auth.js'
 
@@ -9,6 +9,7 @@ const log = getLogger('Auth:BindEmail')
 /**
  * POST /auth/bind-email（需 JWT 鉴权）
  * 小程序端绑定邮箱：当前用户 + email + password → bcrypt → 绑定
+ * 如果邮箱已被其他账号注册，验证密码后自动合并两账号
  */
 export async function bindEmailHandler(req: Request, res: Response): Promise<void> {
   try {
@@ -46,7 +47,23 @@ export async function bindEmailHandler(req: Request, res: Response): Promise<voi
     // 检查邮箱是否已被其他用户绑定
     const existing = await findByEmail(email)
     if (existing) {
-      res.status(409).json({ error: 'EMAIL_ALREADY_BOUND', message: '该邮箱已被其他账号绑定' })
+      // 邮箱已注册 → 验证密码，合并账号
+      if (!existing.password_hash) {
+        res.status(400).json({ error: 'EMAIL_NO_PASSWORD', message: '该邮箱账号未设置密码，无法绑定' })
+        return
+      }
+      const valid = await bcrypt.compare(password, existing.password_hash)
+      if (!valid) {
+        res.status(403).json({ error: 'EMAIL_OR_PASSWORD_MISMATCH', message: '邮箱或密码错误' })
+        return
+      }
+      // 密码正确 → 合并账号（迁移占卜记录，删除旧账号）
+      await mergeAccount(userId, existing.id)
+      log.info({ userId, mergedFrom: existing.id, email }, 'Account merged on email bind')
+      res.json({
+        message: '邮箱绑定成功，已与已有账号合并',
+        email,
+      })
       return
     }
 

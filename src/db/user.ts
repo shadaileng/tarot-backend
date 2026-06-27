@@ -248,6 +248,17 @@ export async function bindPhone(userId: string, phone: string): Promise<void> {
   log.info({ userId }, 'Phone bound')
 }
 
+/** 合并账号：将源用户的数据迁移到目标用户，然后删除源用户 */
+export async function mergeAccount(targetId: string, sourceId: string): Promise<void> {
+  const db = await getDb()
+  // 迁移占卜记录
+  db.run('UPDATE reading_records SET user_id = ? WHERE user_id = ?', [targetId, sourceId])
+  // 删除源用户
+  db.run('DELETE FROM users WHERE id = ?', [sourceId])
+  saveDb()
+  log.info({ targetId, sourceId }, 'Account merged')
+}
+
 /** 更新用户资料（昵称/头像/性别/生日） */
 export async function updateProfile(userId: string, updates: { nickname?: string; avatarUrl?: string; gender?: number; birthday?: string }): Promise<UserRow | null> {
   const db = await getDb()
