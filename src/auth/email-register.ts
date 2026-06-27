@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
 import bcrypt from 'bcrypt'
 import { findByEmail, createUser, toUserInfo } from '../db/user.js'
+import { createUserStats, findByReferralCode } from '../db/user-stats.js'
 import { signJwt } from './wechat-login.js'
 import { getLogger } from '../logger.js'
 import type { EmailRegisterRequest } from '../types/auth.js'
@@ -13,7 +14,7 @@ const log = getLogger('Auth:EmailRegister')
  */
 export async function emailRegisterHandler(req: Request, res: Response): Promise<void> {
   try {
-    const { email, password } = req.body as EmailRegisterRequest
+    const { email, password, referralCode } = req.body as EmailRegisterRequest & { referralCode?: string }
 
     // 校验
     if (!email || !password) {
@@ -49,7 +50,15 @@ export async function emailRegisterHandler(req: Request, res: Response): Promise
       nickname: email.split('@')[0],
     })
 
-    log.info({ userId: user.id, email }, 'Email registered')
+    // 处理邀请
+    let invitedBy: string | undefined
+    if (referralCode) {
+      const inviter = await findByReferralCode(referralCode)
+      if (inviter) invitedBy = referralCode
+    }
+    await createUserStats(user.id, invitedBy)
+
+    log.info({ userId: user.id, email, invitedBy }, 'Email registered')
 
     // 签发 JWT
     const token = signJwt(user.id, user.openid || '')

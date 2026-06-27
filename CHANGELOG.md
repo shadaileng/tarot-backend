@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026-06-27
+
+### Added
+
+- 新增积分等级体系相关数据库表：user_stats, level_definitions, checkin_records, invite_records, task_definitions, user_tasks
+- 新增 `createUserStats`：注册时自动创建用户统计行并生成邀请码
+- 新增注册时可选传入 `referralCode` 参数支持邀请关系绑定
+
 ## [2.7.2] - 2026-06-27
 
 ### Fixed

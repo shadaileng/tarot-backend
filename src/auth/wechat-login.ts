@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 import { config } from '../config.js'
 import { getLogger } from '../logger.js'
 import { findByOpenid, findByUnionid, createUser, updateLastLogin, updateUnionid, toUserInfo } from '../db/user.js'
+import { createUserStats, findByReferralCode } from '../db/user-stats.js'
 import type { WechatLoginRequest, WechatSession } from '../types/auth.js'
 
 const log = getLogger('Auth:WechatLogin')
@@ -72,10 +73,17 @@ export async function wechatLoginHandler(req: Request, res: Response): Promise<v
 
     if (!user) {
       // 新用户
+      const { referralCode } = req.body as WechatLoginRequest & { referralCode?: string }
+      let invitedBy: string | undefined
+      if (referralCode) {
+        const inviter = await findByReferralCode(referralCode)
+        if (inviter) invitedBy = referralCode
+      }
       user = await createUser({
         openid,
         unionid: unionid || undefined,
       })
+      await createUserStats(user.id, invitedBy)
       isNewUser = true
     }
 
