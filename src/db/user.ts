@@ -271,14 +271,14 @@ export async function mergeAccount(targetId: string, sourceId: string): Promise<
   // 迁移占卜记录
   db.run('UPDATE reading_records SET user_id = ? WHERE user_id = ?', [targetId, sourceId])
 
-  // 将邮箱和密码转移到目标用户
+  // 先软删源用户（deleted_at 非 NULL 后，部分唯一索引不再覆盖它）
+  db.run('UPDATE users SET deleted_at = ? WHERE id = ?', [now, sourceId])
+
+  // 再将邮箱和密码转移到目标用户（此时索引中无冲突行）
   if (source.email) {
     db.run('UPDATE users SET email = ?, password_hash = ? WHERE id = ?',
       [source.email, source.password_hash, targetId])
   }
-
-  // 逻辑删除源用户（保留 email 供日后恢复查找）
-  db.run('UPDATE users SET deleted_at = ? WHERE id = ?', [now, sourceId])
 
   saveDb()
   log.info({ targetId, sourceId, email: source.email }, 'Account merged (soft delete)')
