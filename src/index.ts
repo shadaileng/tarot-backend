@@ -27,6 +27,7 @@ import { emailLoginHandler } from './auth/email-login.js'
 import { bindEmailHandler } from './auth/bind-email.js'
 import { bindPhoneHandler } from './auth/bind-phone.js'
 import { updateProfileHandler } from './auth/update-profile.js'
+import { getProfileHandler } from './auth/get-profile.js'
 import { getUserRecords, getRecordById, saveRecord, deleteRecord } from './db/reading-record.js'
 import {
   findAdminByUsername, updateLastLogin, initAdminIfNeeded, findAdminById, changePassword,
@@ -167,6 +168,7 @@ app.post('/api/auth/bind-email', jwtAuthMiddleware, bindEmailHandler)
 app.post('/api/auth/bind-phone', jwtAuthMiddleware, bindPhoneHandler)
 
 // 用户资料（需要 JWT 鉴权）
+app.get('/api/user/profile', jwtAuthMiddleware, getProfileHandler)
 app.put('/api/user/profile', jwtAuthMiddleware, updateProfileHandler)
 
 // ========== Admin 认证路由 ==========
