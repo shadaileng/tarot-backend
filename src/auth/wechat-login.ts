@@ -43,6 +43,12 @@ export async function wechatLoginHandler(req: Request, res: Response): Promise<v
     let isNewUser = false
 
     if (user) {
+      // 检查是否已注销
+      if (user.deleted_at) {
+        log.warn({ userId: user.id, openid }, 'Deleted user attempted to log in')
+        res.status(403).json({ error: 'ACCOUNT_DELETED', message: '账号已被注销，无法登录' })
+        return
+      }
       // 已有用户：更新 unionid 和最后登录时间
       if (unionid && !user.unionid) {
         await updateUnionid(user.id, unionid)
@@ -53,6 +59,12 @@ export async function wechatLoginHandler(req: Request, res: Response): Promise<v
       // 按 unionid 查找（可能已有邮箱注册账号）
       user = await findByUnionid(unionid)
       if (user) {
+        // 检查是否已注销
+        if (user.deleted_at) {
+          log.warn({ userId: user.id, unionid, openid }, 'Deleted user attempted to log in via unionid')
+          res.status(403).json({ error: 'ACCOUNT_DELETED', message: '账号已被注销，无法登录' })
+          return
+        }
         await updateLastLogin(user.id)
         log.info({ userId: user.id, unionid, openid }, 'User linked by unionid')
       }

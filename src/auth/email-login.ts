@@ -34,6 +34,12 @@ export async function emailLoginHandler(req: Request, res: Response): Promise<vo
       return
     }
 
+    // 检查是否已注销
+    if (user.deleted_at) {
+      res.status(403).json({ error: 'ACCOUNT_DELETED', message: '账号已被注销，无法登录' })
+      return
+    }
+
     // 更新最后登录时间
     await updateLastLogin(user.id)
 
