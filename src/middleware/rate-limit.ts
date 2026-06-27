@@ -9,14 +9,12 @@ const log = getLogger('Middleware:RateLimit')
 const WINDOW_MS = 60_000
 /** 每分钟最大请求数 */
 const MAX_PER_MINUTE = 3
-/** 每天最大请求数 */
-const MAX_PER_DAY = 30
 
 // ========== 内存存储 ==========
 
 interface RateLimitEntry {
-  perMinute: { count: number; windowStart: number }
-  perDay: { count: number; windowStart: number }
+  count: number
+  windowStart: number
 }
 
 const store = new Map<string, RateLimitEntry>()
@@ -25,9 +23,7 @@ const store = new Map<string, RateLimitEntry>()
 setInterval(() => {
   const now = Date.now()
   for (const [key, entry] of store) {
-    const minExpired = now - entry.perMinute.windowStart > WINDOW_MS
-    const dayExpired = now - entry.perDay.windowStart > 24 * 60 * 60 * 1000
-    if (minExpired && dayExpired) {
+    if (now - entry.windowStart > WINDOW_MS) {
       store.delete(key)
     }
   }
@@ -37,32 +33,23 @@ setInterval(() => {
 
 /**
  * 频率限制中间件
- * 策略：每用户每分钟最多 3 次，每天最多 30 次
+ * 策略：每用户每分钟最多 3 次（日额度由 quotaMiddleware 管理）
  * 需在 jwtAuthMiddleware 之后使用（依赖 req.userId）
  */
 export function rateLimitMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (!req.userId) return next()
 
   const now = Date.now()
-  const entry = store.get(req.userId) || {
-    perMinute: { count: 0, windowStart: now },
-    perDay: { count: 0, windowStart: now },
-  }
+  const entry = store.get(req.userId) || { count: 0, windowStart: now }
 
   // 分钟窗口检查
-  if (now - entry.perMinute.windowStart > WINDOW_MS) {
-    entry.perMinute = { count: 0, windowStart: now }
+  if (now - entry.windowStart > WINDOW_MS) {
+    entry.count = 0
+    entry.windowStart = now
   }
 
-  // 日窗口检查
-  const DAY_MS = 24 * 60 * 60 * 1000
-  if (now - entry.perDay.windowStart > DAY_MS) {
-    entry.perDay = { count: 0, windowStart: now }
-  }
-
-  // 分钟限制
-  if (entry.perMinute.count >= MAX_PER_MINUTE) {
-    const resetIn = Math.ceil((entry.perMinute.windowStart + WINDOW_MS - now) / 1000)
+  if (entry.count >= MAX_PER_MINUTE) {
+    const resetIn = Math.ceil((entry.windowStart + WINDOW_MS - now) / 1000)
     res.set('Retry-After', String(resetIn))
     res.status(429).json({
       error: 'RATE_LIMITED',
@@ -71,23 +58,12 @@ export function rateLimitMiddleware(req: Request, res: Response, next: NextFunct
     return
   }
 
-  // 日限制
-  if (entry.perDay.count >= MAX_PER_DAY) {
-    res.status(429).json({
-      error: 'DAILY_LIMIT_EXCEEDED',
-      message: `今日请求次数已达上限（每天最多 ${MAX_PER_DAY} 次）`,
-    })
-    return
-  }
-
   // 计数
-  entry.perMinute.count++
-  entry.perDay.count++
+  entry.count++
   store.set(req.userId, entry)
 
   // 响应头
-  res.set('X-RateLimit-Minute-Remaining', String(MAX_PER_MINUTE - entry.perMinute.count))
-  res.set('X-RateLimit-Day-Remaining', String(MAX_PER_DAY - entry.perDay.count))
+  res.set('X-RateLimit-Minute-Remaining', String(MAX_PER_MINUTE - entry.count))
 
   next()
 }
