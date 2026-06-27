@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0] - 2026-06-27
+
+### Added
+
+- 新增签到 API：`POST /api/checkin`（每日打卡，连续签到奖励 +2/天，上限 +20）
+- 新增签到状态 API：`GET /api/checkin/status`
+
 ## [2.9.0] - 2026-06-27
 
 ### Added
