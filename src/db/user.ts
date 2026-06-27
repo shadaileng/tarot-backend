@@ -289,6 +289,9 @@ export async function unbindEmail(userId: string): Promise<void> {
   const db = await getDb()
   const user = await findById(userId)
   if (!user || !user.email) return
+  if (!user.openid) {
+    throw new Error('纯邮箱用户无法解除邮箱绑定')
+  }
 
   const email = user.email
 

@@ -657,7 +657,11 @@ app.put('/api/admin/users/:id/unbind-email', adminAuthMiddleware, async (req, re
   try {
     await unbindEmail(req.params.id)
     res.json({ message: '邮箱已解除绑定' })
-  } catch (err) {
+  } catch (err: any) {
+    if (err.message === '纯邮箱用户无法解除邮箱绑定') {
+      res.status(400).json({ error: 'CANNOT_UNBIND', message: err.message })
+      return
+    }
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '操作失败' })
   }
 })
