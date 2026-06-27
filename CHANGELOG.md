@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1] - 2026-06-26
+
+### Fixed
+
+- POST `/api/poster` 响应添加 `X-Cache-Key` header，新增 `GET /api/poster/:cacheKey` 缓存下载路由，供小程序通过 `uni.downloadFile` 获取真实文件系统路径
+
+## [2.5.0] - 2026-06-26
+
+### Added
+
+- 新增 `HTTPS_PROXY` 配置项，支持通过 admin 面板热配置 Gemini API 代理地址（`undici.ProxyAgent`），解决中国大陆网络环境下 Google API 不可达问题；未配置时直连无额外开销
+- 新增 `src/fetch-proxy.ts` 代理感知 fetch 包装器，支持运行时动态切换代理地址，旧代理连接自动释放
+
 ## [2.4.0] - 2026-06-26
 
 ### Added

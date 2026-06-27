@@ -13,6 +13,7 @@ export const configMeta: ConfigMeta[] = [
   { key: 'NODE_ENV', envKey: 'NODE_ENV', group: '系统配置', editable: false, type: 'string', defaultValue: 'development' },
 
   { key: 'GEMINI_API_KEY', envKey: 'GEMINI_API_KEY', group: 'AI 配置', editable: true, sensitive: true, type: 'string', defaultValue: '' },
+  { key: 'HTTPS_PROXY', envKey: 'HTTPS_PROXY', group: 'AI 配置', editable: true, sensitive: false, type: 'string', defaultValue: '' },
 
   { key: 'CORS_ORIGIN', envKey: 'CORS_ORIGIN', group: '安全配置', editable: false, type: 'string', defaultValue: '*' },
 
@@ -50,6 +51,7 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN || '*',
 
   geminiApiKey: process.env.GEMINI_API_KEY || '',
+  httpsProxy: process.env.HTTPS_PROXY || '',
 
   puppeteer: {
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
@@ -98,6 +100,9 @@ export function updateConfig(key: string, value: string): void {
       break
     case 'GEMINI_API_KEY':
       config.geminiApiKey = value
+      break
+    case 'HTTPS_PROXY':
+      config.httpsProxy = value
       break
     case 'WECHAT_APPID':
       config.wechatAppId = value

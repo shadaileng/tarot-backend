@@ -288,6 +288,7 @@ curl "http://localhost:3000/health?noCache=1"
 | `TZ` | 基础服务 | 时区 | `Asia/Shanghai` | |
 | `LOG_LEVEL` | 基础服务 | 日志级别（trace/debug/info/warn/error/fatal） | `info` | |
 | `GEMINI_API_KEY` | AI 解读 | Gemini API 密钥 | — | **✅** |
+| `HTTPS_PROXY` | AI 解读 | Gemini API 代理地址（支持 http/https/socks5） | 空（不代理） | |
 | `CORS_ORIGIN` | 安全鉴权 | CORS 来源 | `*` | |
 | `DB_PATH` | 数据存储 | SQLite 路径 | `./data/tarot.db` | |
 | `LOG_RETENTION_DAYS` | 数据存储 | 日志保留天数 | `30` | |

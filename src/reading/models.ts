@@ -1,6 +1,7 @@
 import type { ModelCache, QuotaExhaustedCache } from './types.js'
 import { systemPrompt, buildUserPrompt } from './prompt.js'
 import { getLogger } from '../logger.js'
+import { fetchWithProxy } from '../fetch-proxy.js'
 
 const log = getLogger('gemini')
 
@@ -139,7 +140,7 @@ function shouldMarkQuotaExhausted(status: number): boolean {
 
 async function fetchAvailableModels(apiKey: string): Promise<{ up: boolean; detail: string; models: string[] }> {
   try {
-    const res = await fetch(
+    const res = await fetchWithProxy(
       `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`,
       { method: 'GET' },
     )
@@ -267,7 +268,7 @@ export async function callGeminiReading(apiKey: string, question: string | undef
   let fallbackReading: { reading: string; model: string; incomplete: boolean; truncated: boolean } | null = null
 
   for (const model of modelsToTry) {
-    const geminiResponse = await fetch(
+    const geminiResponse = await fetchWithProxy(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
       {
         method: 'POST',
