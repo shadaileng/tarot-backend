@@ -33,8 +33,10 @@ export async function updateProfileHandler(req: Request, res: Response): Promise
     }
 
     // 校验性别
+    let parsedGender = gender
     if (gender !== undefined) {
-      if (![0, 1, 2].includes(gender)) {
+      parsedGender = Number(gender)
+      if (![0, 1, 2].includes(parsedGender)) {
         res.status(400).json({ error: 'INVALID_GENDER', message: '性别值无效（0=保密, 1=男, 2=女）' })
         return
       }
@@ -52,7 +54,7 @@ export async function updateProfileHandler(req: Request, res: Response): Promise
     const updated = await updateUserProfile(userId, {
       nickname: nickname?.trim(),
       avatarUrl: avatarUrl || undefined,
-      gender: gender !== undefined ? gender : undefined,
+      gender: parsedGender !== undefined ? parsedGender : undefined,
       birthday: birthday !== undefined ? birthday : undefined,
     })
 
@@ -61,7 +63,7 @@ export async function updateProfileHandler(req: Request, res: Response): Promise
       return
     }
 
-    log.info({ userId, nickname, avatarUrl, gender, birthday }, 'Profile updated')
+    log.info({ userId, nickname, avatarUrl, gender: parsedGender, birthday }, 'Profile updated')
 
     res.json({ user: toUserInfo(updated) })
   } catch (err) {
