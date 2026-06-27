@@ -31,6 +31,7 @@ export interface UserRow {
   birthday: string | null
   created_at: string
   last_login_at: string
+  deleted_at: string | null
 }
 
 /** 返回给前端的用户信息（脱敏） */

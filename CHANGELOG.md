@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-06-27
+
+### Added
+
+- mergeAccount 改为软删除，源用户保留 email 供日后恢复
+- 新增 unbindEmail: 解除邮箱绑定并自动恢复被合并的原邮箱用户
+- 新增 softDeleteUser / restoreUser: 逻辑删除与恢复用户
+- queryUsers 增加 deleted 参数，支持查询已删除用户
+- 邮箱唯一索引增加 deleted_at IS NULL 条件，允许已删除用户保留邮箱
+
+### Fixed
+
+- 修复排序: COALESCE(last_request_at, last_login_at, created_at) DESC，微信用户不再沉底
+
 ## [2.6.0] - 2026-06-27
 
 ### Added

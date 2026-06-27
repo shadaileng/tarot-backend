@@ -18,7 +18,7 @@ import { getLogger } from './logger.js'
 import { readingHandler } from './reading/handler.js'
 import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } from './reading/models.js'
 import { queryLogs, getLogById } from './db/reading-log.js'
-import { queryUsers } from './db/user.js'
+import { queryUsers, unbindEmail, softDeleteUser, restoreUser } from './db/user.js'
 import { getAllConfig, upsertConfig, initDefaultConfig, loadUserConfig } from './db/config.js'
 import { getDb } from './db/index.js'
 import { wechatLoginHandler } from './auth/wechat-login.js'
@@ -647,8 +647,39 @@ app.get('/api/admin/users', adminAuthMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1
   const limit = Math.min(parseInt(req.query.limit as string) || 20, 100)
   const keyword = req.query.keyword as string | undefined
-  const result = await queryUsers(page, limit, keyword)
+  const deleted = req.query.deleted === 'true'
+  const result = await queryUsers(page, limit, keyword, deleted)
   res.json(result)
+})
+
+// 解除邮箱绑定（自动恢复被合并的原邮箱用户）
+app.put('/api/admin/users/:id/unbind-email', adminAuthMiddleware, async (req, res) => {
+  try {
+    await unbindEmail(req.params.id)
+    res.json({ message: '邮箱已解除绑定' })
+  } catch (err) {
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '操作失败' })
+  }
+})
+
+// 逻辑删除用户
+app.delete('/api/admin/users/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    await softDeleteUser(req.params.id)
+    res.json({ message: '用户已删除（可恢复）' })
+  } catch (err) {
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '操作失败' })
+  }
+})
+
+// 恢复已删除用户
+app.put('/api/admin/users/:id/restore', adminAuthMiddleware, async (req, res) => {
+  try {
+    await restoreUser(req.params.id)
+    res.json({ message: '用户已恢复' })
+  } catch (err) {
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '操作失败' })
+  }
 })
 
 // ========== 用户级占卜记录（JWT 鉴权）==========

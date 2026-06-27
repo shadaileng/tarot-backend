@@ -155,6 +155,17 @@ function initSchema(database: Database): void {
   try {
     database.run('ALTER TABLE users ADD COLUMN birthday TEXT')
   } catch {}
+
+  // 兼容已有数据库：软删除支持
+  try {
+    database.run('ALTER TABLE users ADD COLUMN deleted_at TEXT')
+  } catch {}
+
+  // 更新邮箱唯一索引以支持软删除（排除已删除用户）
+  try {
+    database.run('DROP INDEX IF EXISTS idx_users_email')
+  } catch {}
+  database.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL AND email != '' AND deleted_at IS NULL`)
 }
 
 export function closeDb(): void {

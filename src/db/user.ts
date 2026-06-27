@@ -47,6 +47,7 @@ export interface AdminUserRow {
   last_login_at: string | null
   request_count: number
   last_request_at: string | null
+  deleted_at: string | null
 }
 
 export interface UserQueryResult {
@@ -61,17 +62,24 @@ export async function queryUsers(
   page: number = 1,
   limit: number = 20,
   keyword?: string,
+  deleted?: boolean,
 ): Promise<UserQueryResult> {
   const db = await getDb()
   const where: string[] = []
   const params: any[] = []
+
+  if (deleted) {
+    where.push('u.deleted_at IS NOT NULL')
+  } else {
+    where.push('u.deleted_at IS NULL')
+  }
 
   if (keyword) {
     where.push('(u.nickname LIKE ? OR u.email LIKE ?)')
     params.push(`%${keyword}%`, `%${keyword}%`)
   }
 
-  const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : ''
+  const whereClause = 'WHERE ' + where.join(' AND ')
 
   // count
   const countResult = db.exec(
@@ -83,19 +91,22 @@ export async function queryUsers(
       ? Number(countResult[0].values[0][0])
       : 0
 
-  // data — 带请求统计，按最近请求时间倒序
+  // data — 带请求统计
   const offset = (page - 1) * limit
+  const orderBy = deleted
+    ? 'u.deleted_at DESC'
+    : 'COALESCE(u.last_request_at, u.last_login_at, u.created_at) DESC'
   const querySql = `
     SELECT
       u.id, u.openid, u.nickname, u.avatar_url, u.email, u.phone,
-      u.created_at, u.last_login_at,
+      u.created_at, u.last_login_at, u.deleted_at,
       COUNT(l.id)   AS request_count,
       MAX(l.created_at) AS last_request_at
     FROM users u
     LEFT JOIN reading_logs l ON u.id = l.user_id
     ${whereClause}
     GROUP BY u.id
-    ORDER BY last_request_at DESC
+    ORDER BY ${orderBy}
     LIMIT ? OFFSET ?
   `
   const stmt = db.prepare(querySql)
@@ -248,15 +259,72 @@ export async function bindPhone(userId: string, phone: string): Promise<void> {
   log.info({ userId }, 'Phone bound')
 }
 
-/** 合并账号：将源用户的数据迁移到目标用户，然后删除源用户 */
+/** 合并账号：将源用户的数据迁移到目标用户，然后逻辑删除源用户（可恢复） */
 export async function mergeAccount(targetId: string, sourceId: string): Promise<void> {
   const db = await getDb()
+  const now = new Date().toISOString()
+
+  // 获取源用户数据
+  const source = await findById(sourceId)
+  if (!source) return
+
   // 迁移占卜记录
   db.run('UPDATE reading_records SET user_id = ? WHERE user_id = ?', [targetId, sourceId])
-  // 删除源用户
-  db.run('DELETE FROM users WHERE id = ?', [sourceId])
+
+  // 将邮箱和密码转移到目标用户
+  if (source.email) {
+    db.run('UPDATE users SET email = ?, password_hash = ? WHERE id = ?',
+      [source.email, source.password_hash, targetId])
+  }
+
+  // 逻辑删除源用户（保留 email 供日后恢复查找）
+  db.run('UPDATE users SET deleted_at = ? WHERE id = ?', [now, sourceId])
+
   saveDb()
-  log.info({ targetId, sourceId }, 'Account merged')
+  log.info({ targetId, sourceId, email: source.email }, 'Account merged (soft delete)')
+}
+
+/** 解除邮箱绑定（Admin 端）— 自动恢复被软删除的原邮箱用户 */
+export async function unbindEmail(userId: string): Promise<void> {
+  const db = await getDb()
+  const user = await findById(userId)
+  if (!user || !user.email) return
+
+  const email = user.email
+
+  // 清空当前用户的邮箱和密码
+  db.run('UPDATE users SET email = NULL, password_hash = NULL WHERE id = ?', [userId])
+
+  // 查找被软删除的原邮箱用户并恢复
+  const stmt = db.prepare('SELECT id FROM users WHERE email = ? AND deleted_at IS NOT NULL LIMIT 1')
+  stmt.bind([email])
+  if (stmt.step()) {
+    const row = stmt.getAsObject() as { id: string }
+    db.run('UPDATE users SET deleted_at = NULL WHERE id = ?', [row.id])
+    log.info({ userId, email, restoredUserId: row.id }, 'Email unbound, source user restored')
+  } else {
+    log.info({ userId, email }, 'Email unbound (no source user to restore)')
+  }
+  stmt.free()
+
+  saveDb()
+}
+
+/** 逻辑删除用户（Admin 端） */
+export async function softDeleteUser(userId: string): Promise<void> {
+  const db = await getDb()
+  const now = new Date().toISOString()
+  db.run('UPDATE users SET deleted_at = ? WHERE id = ?', [now, userId])
+  saveDb()
+  log.info({ userId }, 'User soft deleted')
+}
+
+/** 恢复已删除用户（Admin 端） */
+export async function restoreUser(userId: string): Promise<void> {
+  const db = await getDb()
+  db.run('UPDATE users SET deleted_at = NULL WHERE id = ?', [userId])
+  saveDb()
+  log.info({ userId }, 'User restored')
 }
 
 /** 更新用户资料（昵称/头像/性别/生日） */
