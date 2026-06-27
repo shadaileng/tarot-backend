@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-06-27
+
+### Added
+
+- 用户资料支持性别（gender）和生日（birthday）字段，可在小程序个人资料页编辑
+- 数据库 `users` 表新增 `gender` 和 `birthday` 列，含自动迁移兼容
+
 ## [2.4.1] - 2026-06-26
 
 ### Fixed

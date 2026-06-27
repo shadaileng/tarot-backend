@@ -27,6 +27,8 @@ export interface UserRow {
   phone: string | null
   nickname: string
   avatar_url: string | null
+  gender: number | null
+  birthday: string | null
   created_at: string
   last_login_at: string
 }
@@ -38,6 +40,8 @@ export interface UserInfo {
   avatarUrl: string | null
   email?: string | null
   phone?: string | null      // 脱敏后
+  gender?: number | null
+  birthday?: string | null
   createdAt: string
 }
 
@@ -93,6 +97,8 @@ export interface BindPhoneRequest {
 export interface UpdateProfileRequest {
   nickname?: string
   avatarUrl?: string
+  gender?: number
+  birthday?: string
 }
 
 /** Admin JWT payload */

@@ -13,6 +13,8 @@ function toUserInfo(row: UserRow): UserInfo {
     avatarUrl: row.avatar_url,
     email: row.email,
     phone: row.phone ? maskPhone(row.phone) : null,
+    gender: row.gender,
+    birthday: row.birthday,
     createdAt: row.created_at,
   }
 }
@@ -179,6 +181,8 @@ interface CreateUserParams {
   phone?: string
   nickname?: string
   avatarUrl?: string
+  gender?: number
+  birthday?: string
 }
 
 /** 创建新用户 */
@@ -188,8 +192,8 @@ export async function createUser(params: CreateUserParams): Promise<UserRow> {
   const id = uuidv4()
 
   db.run(
-    `INSERT INTO users (id, openid, unionid, email, password_hash, phone, nickname, avatar_url, created_at, last_login_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO users (id, openid, unionid, email, password_hash, phone, nickname, avatar_url, gender, birthday, created_at, last_login_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       params.openid || '',
@@ -199,6 +203,8 @@ export async function createUser(params: CreateUserParams): Promise<UserRow> {
       params.phone || null,
       params.nickname || '匿名用户',
       params.avatarUrl || null,
+      params.gender ?? 0,
+      params.birthday || null,
       now,
       now,
     ]
@@ -242,8 +248,8 @@ export async function bindPhone(userId: string, phone: string): Promise<void> {
   log.info({ userId }, 'Phone bound')
 }
 
-/** 更新用户资料（昵称/头像） */
-export async function updateProfile(userId: string, updates: { nickname?: string; avatarUrl?: string }): Promise<UserRow | null> {
+/** 更新用户资料（昵称/头像/性别/生日） */
+export async function updateProfile(userId: string, updates: { nickname?: string; avatarUrl?: string; gender?: number; birthday?: string }): Promise<UserRow | null> {
   const db = await getDb()
   const sets: string[] = []
   const params: any[] = []
@@ -255,6 +261,14 @@ export async function updateProfile(userId: string, updates: { nickname?: string
   if (updates.avatarUrl !== undefined) {
     sets.push('avatar_url = ?')
     params.push(updates.avatarUrl)
+  }
+  if (updates.gender !== undefined) {
+    sets.push('gender = ?')
+    params.push(updates.gender)
+  }
+  if (updates.birthday !== undefined) {
+    sets.push('birthday = ?')
+    params.push(updates.birthday || null)
   }
 
   if (sets.length === 0) return findById(userId)

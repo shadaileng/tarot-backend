@@ -90,6 +90,8 @@ function initSchema(database: Database): void {
       phone         TEXT,
       nickname      TEXT DEFAULT '匿名用户',
       avatar_url    TEXT,
+      gender        INTEGER DEFAULT 0,
+      birthday      TEXT,
       created_at    TEXT NOT NULL,
       last_login_at TEXT NOT NULL
     )
@@ -145,6 +147,14 @@ function initSchema(database: Database): void {
   } catch {
     // 列已存在时静默忽略（SQLite 不支持 IF NOT EXISTS for ALTER TABLE）
   }
+
+  // 兼容已有数据库：为 users 表新增 gender / birthday 列
+  try {
+    database.run('ALTER TABLE users ADD COLUMN gender INTEGER DEFAULT 0')
+  } catch {}
+  try {
+    database.run('ALTER TABLE users ADD COLUMN birthday TEXT')
+  } catch {}
 }
 
 export function closeDb(): void {
