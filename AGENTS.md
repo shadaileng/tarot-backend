@@ -62,7 +62,14 @@ tarot-backend/
 │   │
 │   ├── db/                      # ★ 新增：SQLite 数据库
 │   │   ├── index.ts             # 初始化 + 建表
-│   │   └── reading-log.ts       # insertLog / queryLogs / getLogById
+│   │   ├── reading-log.ts       # insertLog / queryLogs / getLogById
+│   │   ├── user.ts              # 用户 CRUD
+│   │   ├── reading-record.ts    # 占卜记录 CRUD
+│   │   ├── admin.ts             # 管理员 CRUD
+│   │   ├── config.ts            # 配置持久化
+│   │   ├── user-stats.ts        # ★ 积分/等级/额度 CRUD
+│   │   ├── tasks.ts             # ★ 任务系统
+│   │   └── invite.ts            # ★ 邀请系统
 │   │
 │   ├── gateway/                 # ★ 新增：网关中间件
 │   │   └── logging.ts           # 请求/响应拦截 → SQLite
@@ -71,7 +78,8 @@ tarot-backend/
 │   │   ├── cors.ts              # CORS 中间件
 │   │   ├── jwt-auth.ts           # JWT 鉴权（用户端）
 │   │   ├── admin-auth.ts         # Admin JWT 鉴权（管理端）
-│   │   └── rate-limit.ts         # 频率限制
+│   │   ├── rate-limit.ts         # 频率限制（分钟级防刷）
+│   │   └── quota.ts              # ★ 额度控制（用户/游客）
 │   │
 │   ├── cache/                   # ◆ 复制自 poster-service
 │   │   └── index.ts             # LRU 内存缓存（SHA256 键 + TTL）
@@ -151,20 +159,29 @@ POST /poster  { cards[], question, spreadName, ... }
 | GET | `/health` | 健康检查 | ❌ | ❌ |
 | GET | `/metrics` | Prometheus 指标 | ❌ | ❌ |
 | POST | `/reading` | AI 塔罗解读 | ❌ | ✅ |
-| POST | `/poster` | 海报生成 PNG | ✅ 可选 | ✅ |
+| POST | `/poster` | 海报生成 PNG | ❌ | ✅ |
+| GET | `/poster/:cacheKey` | 缓存海报 | ❌ | ❌ |
 | GET | `/logs` | 查询日志 | ❌ | ❌ |
 | GET | `/logs/:id` | 日志详情 | ❌ | ❌ |
 | POST | `/api/auth/wechat-login` | 微信登录 | ❌ | ❌ |
-| POST | `/api/auth/email-register` | 邮箱注册 | ❌ | ❌ |
+| POST | `/api/auth/email-register` | 邮箱注册（支持 `referralCode`） | ❌ | ❌ |
 | POST | `/api/auth/email-login` | 邮箱登录 | ❌ | ❌ |
 | POST | `/api/auth/bind-email` | 绑定邮箱 | JWT | ❌ |
 | POST | `/api/auth/bind-phone` | 绑定手机 | JWT | ❌ |
-| GET | `/api/user/profile` | 获取个人资料 | JWT | ❌ |
+| GET | `/api/user/profile` | 获取个人资料（含等级/积分） | JWT | ❌ |
 | PUT | `/api/user/profile` | 更新个人资料 | JWT | ❌ |
 | GET | `/api/user/records` | 我的占卜记录 | JWT | ❌ |
 | POST | `/api/user/records` | 保存占卜记录 | JWT | ❌ |
 | GET | `/api/user/records/:id` | 记录详情 | JWT | ❌ |
 | DELETE | `/api/user/records/:id` | 删除记录 | JWT | ❌ |
+| GET | `/api/user/stats` | 用户积分/等级/额度 | JWT | ❌ |
+| POST | `/api/checkin` | 每日签到 | JWT | ❌ |
+| GET | `/api/checkin/status` | 签到状态 | JWT | ❌ |
+| GET | `/api/tasks` | 任务列表+进度 | JWT | ❌ |
+| POST | `/api/tasks/:id/claim` | 领取任务奖励 | JWT | ❌ |
+| GET | `/api/invite/code` | 获取邀请码 | JWT | ❌ |
+| GET | `/api/invite/records` | 邀请记录 | JWT | ❌ |
+| GET | `/api/levels` | 等级配置表 | ❌ | ❌ |
 | GET | `/api/admin/users` | 用户管理列表 | Admin JWT | ❌ |
 | PUT | `/api/admin/users/:id/unbind-email` | 解除邮箱绑定 | Admin JWT | ❌ |
 | DELETE | `/api/admin/users/:id` | 软删除用户 | Admin JWT | ❌ |
@@ -318,6 +335,92 @@ CREATE TABLE users (
 ```
 
 邮箱唯一索引排除了 `deleted_at IS NOT NULL` 的行，允许已删除用户保留邮箱（用于解绑时恢复查找）。
+
+### 积分等级相关表
+
+```sql
+-- user_stats：用户统计数据（与 users 表一对一）
+CREATE TABLE user_stats (
+  user_id             TEXT PRIMARY KEY,
+  points              INTEGER NOT NULL DEFAULT 0,
+  level               INTEGER NOT NULL DEFAULT 1,
+  extra_quota         INTEGER NOT NULL DEFAULT 0,
+  total_readings      INTEGER NOT NULL DEFAULT 0,
+  daily_quota_used    INTEGER NOT NULL DEFAULT 0,
+  quota_reset_date    TEXT,
+  referral_code       TEXT UNIQUE,         -- 唯一邀请码
+  invited_by          TEXT,                -- 邀请者的 referral_code
+  consecutive_checkins INTEGER NOT NULL DEFAULT 0,
+  last_checkin_date   TEXT,
+  created_at          TEXT,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- level_definitions：等级配置
+CREATE TABLE level_definitions (
+  level           INTEGER PRIMARY KEY,
+  title           TEXT NOT NULL,
+  points_required INTEGER NOT NULL,
+  daily_quota     INTEGER NOT NULL,
+  max_extra_quota INTEGER NOT NULL DEFAULT 100
+);
+
+-- checkin_records：签到记录
+CREATE TABLE checkin_records (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  checkin_date  TEXT NOT NULL,
+  points_earned INTEGER NOT NULL DEFAULT 0,
+  streak_bonus  INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  UNIQUE(user_id, checkin_date)
+);
+
+-- invite_records：邀请记录
+CREATE TABLE invite_records (
+  id            TEXT PRIMARY KEY,
+  inviter_id    TEXT NOT NULL,
+  invitee_id    TEXT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'pending',
+  completed_at  TEXT,
+  created_at    TEXT NOT NULL,
+  FOREIGN KEY (inviter_id) REFERENCES users(id),
+  FOREIGN KEY (invitee_id) REFERENCES users(id)
+);
+
+-- task_definitions：任务定义
+CREATE TABLE task_definitions (
+  id                  TEXT PRIMARY KEY,
+  title               TEXT NOT NULL,
+  description         TEXT,
+  type                TEXT NOT NULL,         -- daily / achievement
+  requirement_type    TEXT NOT NULL,         -- read_count / checkin_streak / invite_count / share_count
+  requirement_count   INTEGER NOT NULL,
+  points_reward       INTEGER NOT NULL DEFAULT 0,
+  extra_quota_reward  INTEGER NOT NULL DEFAULT 0,
+  icon                TEXT,
+  sort_order          INTEGER DEFAULT 0,
+  is_active           INTEGER NOT NULL DEFAULT 1
+);
+
+-- user_tasks：用户任务进度
+CREATE TABLE user_tasks (
+  id              TEXT PRIMARY KEY,
+  user_id         TEXT NOT NULL,
+  task_id         TEXT NOT NULL,
+  progress        INTEGER NOT NULL DEFAULT 0,
+  is_completed    INTEGER NOT NULL DEFAULT 0,
+  reward_claimed  INTEGER NOT NULL DEFAULT 0,
+  completed_at    TEXT,
+  claimed_at      TEXT,
+  reset_date      TEXT,                     -- 每日任务重置日期
+  created_at      TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (task_id) REFERENCES task_definitions(id),
+  UNIQUE(user_id, task_id)
+);
+```
 
 ### 类型体系
 
