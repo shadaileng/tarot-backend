@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2026-06-27
+
+### Added
+
+- 新增 `quotaMiddleware`：统一额度控制，可选解析 JWT，登录用户读 DB 额度，游客基于 IP 每天 2 次
+- 占卜成功后自动消耗额度、递增占卜计数、增加 2 积分
+- `POST /api/poster` 和 `GET /api/poster/:cacheKey` 移除 JWT 鉴权，海报分享公开访问
+
 ## [2.8.0] - 2026-06-27
 
 ### Added

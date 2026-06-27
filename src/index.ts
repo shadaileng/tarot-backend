@@ -7,6 +7,7 @@ import { corsMiddleware } from './middleware/cors.js'
 import { adminAuthMiddleware, type AdminJwtPayload } from './middleware/admin-auth.js'
 import { jwtAuthMiddleware } from './middleware/jwt-auth.js'
 import { rateLimitMiddleware } from './middleware/rate-limit.js'
+import { quotaMiddleware } from './middleware/quota.js'
 import { loggingMiddleware } from './gateway/logging.js'
 import { buildPosterHTML } from './poster/template.js'
 import { renderPoster } from './poster/render.js'
@@ -530,9 +531,9 @@ app.post('/api/admin/admins/:id/reset-password', adminAuthMiddleware, async (req
 
 // ========== 业务接口（JWT 鉴权 + 频率限制）==========
 
-app.post('/api/reading', jwtAuthMiddleware, rateLimitMiddleware, readingHandler)
+app.post('/api/reading', quotaMiddleware, rateLimitMiddleware, readingHandler)
 
-app.post('/api/poster', jwtAuthMiddleware, async (req, res) => {
+app.post('/api/poster', async (req, res) => {
   const requestStart = Date.now()
   const posterData = req.body as PosterData
   const template = getTemplate(posterData.template)
@@ -613,7 +614,7 @@ app.post('/api/poster', jwtAuthMiddleware, async (req, res) => {
   }
 })
 
-app.get('/api/poster/:cacheKey', jwtAuthMiddleware, async (req, res) => {
+app.get('/api/poster/:cacheKey', async (req, res) => {
   const { cacheKey } = req.params
   const cached = posterCache.get(cacheKey)
   if (!cached) {
