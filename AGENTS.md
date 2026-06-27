@@ -154,6 +154,21 @@ POST /poster  { cards[], question, spreadName, ... }
 | POST | `/poster` | 海报生成 PNG | ✅ 可选 | ✅ |
 | GET | `/logs` | 查询日志 | ❌ | ❌ |
 | GET | `/logs/:id` | 日志详情 | ❌ | ❌ |
+| POST | `/api/auth/wechat-login` | 微信登录 | ❌ | ❌ |
+| POST | `/api/auth/email-register` | 邮箱注册 | ❌ | ❌ |
+| POST | `/api/auth/email-login` | 邮箱登录 | ❌ | ❌ |
+| POST | `/api/auth/bind-email` | 绑定邮箱 | JWT | ❌ |
+| POST | `/api/auth/bind-phone` | 绑定手机 | JWT | ❌ |
+| GET | `/api/user/profile` | 获取个人资料 | JWT | ❌ |
+| PUT | `/api/user/profile` | 更新个人资料 | JWT | ❌ |
+| GET | `/api/user/records` | 我的占卜记录 | JWT | ❌ |
+| POST | `/api/user/records` | 保存占卜记录 | JWT | ❌ |
+| GET | `/api/user/records/:id` | 记录详情 | JWT | ❌ |
+| DELETE | `/api/user/records/:id` | 删除记录 | JWT | ❌ |
+| GET | `/api/admin/users` | 用户管理列表 | Admin JWT | ❌ |
+| PUT | `/api/admin/users/:id/unbind-email` | 解除邮箱绑定 | Admin JWT | ❌ |
+| DELETE | `/api/admin/users/:id` | 软删除用户 | Admin JWT | ❌ |
+| PUT | `/api/admin/users/:id/restore` | 恢复已删除用户 | Admin JWT | ❌ |
 
 ### POST /reading
 
@@ -275,6 +290,108 @@ interface ReadingRequestBody {
 ```bash
 # 强制刷新缓存（即时诊断）
 curl "http://localhost:3000/health?noCache=1"
+```
+
+## 用户认证与管理
+
+### 用户数据模型
+
+```sql
+-- users 表（完整数据库行映射到 UserRow）
+CREATE TABLE users (
+  id            TEXT PRIMARY KEY,          -- UUID
+  openid        TEXT NOT NULL DEFAULT '',  -- 微信 openid
+  unionid       TEXT,                      -- 微信 unionid（跨账号标识）
+  email         TEXT,                      -- 邮箱（唯一，受部分索引约束）
+  password_hash TEXT,                      -- bcrypt 哈希（10 轮）
+  phone         TEXT,                      -- 手机号
+  nickname      TEXT DEFAULT '匿名用户',   -- 昵称
+  avatar_url    TEXT,                      -- 头像 URL（dataURL / 微信头像）
+  gender        INTEGER DEFAULT 0,        -- 性别（0=保密 1=男 2=女）
+  birthday      TEXT,                      -- 生日（YYYY-MM-DD）
+  created_at    TEXT NOT NULL,             -- 注册时间
+  last_login_at TEXT NOT NULL,             -- 最后登录时间
+  deleted_at    TEXT                       -- 软删除标记，非 NULL=已删除
+);
+-- 索引：idx_users_openid, idx_users_unionid
+-- 部分唯一索引：idx_users_email (email IS NOT NULL AND email != '' AND deleted_at IS NULL)
+```
+
+邮箱唯一索引排除了 `deleted_at IS NOT NULL` 的行，允许已删除用户保留邮箱（用于解绑时恢复查找）。
+
+### 类型体系
+
+```
+UserRow             — 完整数据库行（含 password_hash, deleted_at 等敏感字段）
+  ↓ toUserInfo()
+UserInfo            — 输出给前端的脱敏信息（phone 脱敏为 138****1234，无 password_hash/deleted_at）
+  ↓ queryUsers()    — 管理端列表（含请求统计）
+AdminUserRow        — 管理端行（含 request_count, last_request_at, deleted_at）
+```
+
+### 认证流程
+
+| 方式 | 端点 | 流程 |
+|------|------|------|
+| 微信登录 | `POST /api/auth/wechat-login` | code → jscode2session → openid/unionid → 查找/创建用户 → 签发 JWT（30天） |
+| 邮箱注册 | `POST /api/auth/email-register` | email+password → 校验格式+查重 → bcrypt → 创建用户 → 签发 JWT |
+| 邮箱登录 | `POST /api/auth/email-login` | email+password → 查找 → bcrypt 校验 → 签发 JWT |
+| 绑定邮箱 | `POST /api/auth/bind-email` | JWT 身份 + email+password → 允许合并已有账号 → bcrypt → 绑定 |
+| 绑定手机 | `POST /api/auth/bind-phone` | JWT 身份 + code → 微信 getPhoneNumber → 绑定 |
+
+**安全机制**：
+- JWT 中间件（`jwt-auth.ts`）每次请求验证 token 后查询 `deleted_at`，已注销用户返回 `401 ACCOUNT_DELETED`
+- 微信登录和邮箱登录入口均检查 `deleted_at`，已注销用户无法获取新 token，返回 `403 ACCOUNT_DELETED`
+- 绑定邮箱时检查冲突，通过 `mergeAccount` 自动合并账号
+
+### 用户资料
+
+| 端点 | 功能 | 可更新字段 |
+|------|------|-----------|
+| `GET /api/user/profile` | 获取当前用户资料 | — |
+| `PUT /api/user/profile` | 更新资料 | `nickname`, `avatarUrl`, `gender`(0/1/2), `birthday`(YYYY-MM-DD) |
+
+### 占卜记录
+
+用户端 CRUD（`/api/user/records`），支持分页和详情查询。
+
+### 管理端用户管理
+
+Admin JWT 保护，详见 `tarot-admin` 的 AGENTS.md。
+
+| 操作 | 端点 | 说明 |
+|------|------|------|
+| 用户列表 | `GET /api/admin/users` | 分页+搜索+`deleted` 筛选，含请求统计和排序 |
+| 解除邮箱 | `PUT /api/admin/users/:id/unbind-email` | 清空邮箱/密码，自动恢复被合并的源用户 |
+| 软删除 | `DELETE /api/admin/users/:id` | 设 `deleted_at=now`，绑定邮箱的微信用户先解绑 |
+| 恢复 | `PUT /api/admin/users/:id/restore` | 设 `deleted_at=NULL` |
+
+### 账号生命周期
+
+```
+注册（微信/邮箱）→ 绑定邮箱（可选合并已有账号）→ 正常使用
+                                                      ↓
+                                              Admin 软删除
+                                                      ↓
+                                              Admin 恢复 → 正常使用
+                                              OR
+                                              删除后 Admin 解绑邮箱
+                                              → 源邮箱用户自动恢复（非微信用户可重新登录）
+```
+
+**合并流程**（绑定邮箱时检测到邮箱已被注册）：
+```
+合并前：
+  [A] 微信 (openid=xxx, email=null)
+  [B] 邮箱 (email=a@test.com, pwd=hash)
+
+mergeAccount(A, B) 后：
+  [A] 微信 (email=a@test.com, pwd=hash)         ← 继承邮箱
+  [B] 邮箱 (email=a@test.com, deleted_at=now)    ← 软删除（保留 email 供恢复查找）
+
+Admin 解除 A 的邮箱绑定：
+  [A] 微信 (email=null, pwd=null)                 ← 清空
+  [B] 邮箱 (email=a@test.com, deleted_at=NULL)    ← 自动恢复
 ```
 
 ## 环境变量
