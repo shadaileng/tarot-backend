@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.13.0] - 2026-06-27
+
+### Added
+
+- 新增用户统计 API：`GET /api/user/stats`（等级/积分/额度信息）
+- 新增等级配置公开 API：`GET /api/levels`
+- `GET /api/user/profile` 集成等级、积分、额度信息
+
+### Changed
+
+- 精简 `rate-limit.ts`：移除日额度逻辑（由 `quotaMiddleware` 统一管理）
+
 ## [2.12.0] - 2026-06-27
 
 ### Added
