@@ -30,6 +30,7 @@ import { bindPhoneHandler } from './auth/bind-phone.js'
 import { updateProfileHandler } from './auth/update-profile.js'
 import { getProfileHandler } from './auth/get-profile.js'
 import { checkinHandler, checkinStatusHandler } from './auth/checkin.js'
+import { getTasksHandler, claimTaskHandler } from './auth/tasks.js'
 import { getUserRecords, getRecordById, saveRecord, deleteRecord } from './db/reading-record.js'
 import {
   findAdminByUsername, updateLastLogin, initAdminIfNeeded, findAdminById, changePassword,
@@ -176,6 +177,10 @@ app.put('/api/user/profile', jwtAuthMiddleware, updateProfileHandler)
 // 签到（需要 JWT 鉴权）
 app.post('/api/checkin', jwtAuthMiddleware, checkinHandler)
 app.get('/api/checkin/status', jwtAuthMiddleware, checkinStatusHandler)
+
+// 任务（需要 JWT 鉴权）
+app.get('/api/tasks', jwtAuthMiddleware, getTasksHandler)
+app.post('/api/tasks/:id/claim', jwtAuthMiddleware, claimTaskHandler)
 
 // ========== Admin 认证路由 ==========
 

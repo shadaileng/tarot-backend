@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { getDb, saveDb } from '../db/index.js'
 import { getLogger } from '../logger.js'
 import { getUserStats, addPoints } from '../db/user-stats.js'
+import { advanceTaskProgress } from '../db/tasks.js'
 
 const log = getLogger('Auth:Checkin')
 
@@ -80,6 +81,20 @@ export async function checkinHandler(req: Request, res: Response): Promise<void>
     saveDb()
 
     await addPoints(userId, totalPoints)
+
+    // 推进连续签到任务进度
+    const checkinStmt = db.prepare(`
+      UPDATE user_tasks SET
+        progress = ?,
+        is_completed = CASE WHEN ? >= (SELECT requirement_count FROM task_definitions WHERE id = task_id) THEN 1 ELSE 0 END,
+        completed_at = CASE WHEN ? >= (SELECT requirement_count FROM task_definitions WHERE id = task_id) THEN ? ELSE completed_at END
+      WHERE user_id = ? AND task_id IN (
+        SELECT id FROM task_definitions WHERE requirement_type = 'checkin_streak' AND is_active = 1
+      )
+    `)
+    checkinStmt.bind([streak, streak, streak, new Date().toISOString(), userId])
+    checkinStmt.step()
+    checkinStmt.free()
 
     log.info({ userId, streak, points: totalPoints }, 'Check-in completed')
 

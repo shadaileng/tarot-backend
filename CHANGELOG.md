@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0] - 2026-06-27
+
+### Added
+
+- 新增任务系统：8 个内置任务（3 个每日任务 + 5 个成就任务）
+- 任务进度自动推进：占卜后更新 `read_count`，签到后更新 `checkin_streak`
+- 新增任务 API：`GET /api/tasks`（任务列表+进度）、`POST /api/tasks/:id/claim`（领取奖励）
+- 新用户注册时自动初始化所有活跃任务
+
 ## [2.10.0] - 2026-06-27
 
 ### Added

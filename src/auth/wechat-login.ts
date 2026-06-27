@@ -4,6 +4,7 @@ import { config } from '../config.js'
 import { getLogger } from '../logger.js'
 import { findByOpenid, findByUnionid, createUser, updateLastLogin, updateUnionid, toUserInfo } from '../db/user.js'
 import { createUserStats, findByReferralCode } from '../db/user-stats.js'
+import { initUserTasks } from '../db/tasks.js'
 import type { WechatLoginRequest, WechatSession } from '../types/auth.js'
 
 const log = getLogger('Auth:WechatLogin')
@@ -84,6 +85,7 @@ export async function wechatLoginHandler(req: Request, res: Response): Promise<v
         unionid: unionid || undefined,
       })
       await createUserStats(user.id, invitedBy)
+      await initUserTasks(user.id)
       isNewUser = true
     }
 

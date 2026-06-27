@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import bcrypt from 'bcrypt'
 import { findByEmail, createUser, toUserInfo } from '../db/user.js'
 import { createUserStats, findByReferralCode } from '../db/user-stats.js'
+import { initUserTasks } from '../db/tasks.js'
 import { signJwt } from './wechat-login.js'
 import { getLogger } from '../logger.js'
 import type { EmailRegisterRequest } from '../types/auth.js'
@@ -57,6 +58,7 @@ export async function emailRegisterHandler(req: Request, res: Response): Promise
       if (inviter) invitedBy = referralCode
     }
     await createUserStats(user.id, invitedBy)
+    await initUserTasks(user.id)
 
     log.info({ userId: user.id, email, invitedBy }, 'Email registered')
 
