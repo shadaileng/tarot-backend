@@ -4,6 +4,7 @@ import { config } from '../config.js'
 import { getLogger } from '../logger.js'
 import { consumeQuota, getAvailableQuota, incrementReadings, addPoints, resetDailyQuotaIfNeeded } from '../db/user-stats.js'
 import { advanceTaskProgress } from '../db/tasks.js'
+import { completeInvite } from '../db/invite.js'
 import type { JwtPayload } from '../types/auth.js'
 
 const log = getLogger('Middleware:Quota')
@@ -80,6 +81,7 @@ export async function quotaMiddleware(req: Request, res: Response, next: NextFun
         incrementReadings(userId).catch((e: Error) => log.warn({ err: e }, 'Failed to increment readings'))
         addPoints(userId, 2).catch((e: Error) => log.warn({ err: e }, 'Failed to add points'))
         advanceTaskProgress(userId, 'read_count').catch((e: Error) => log.warn({ err: e }, 'Failed to advance task'))
+        completeInvite(userId).catch((e: Error) => log.warn({ err: e }, 'Failed to process invite'))
       }
     }
     res.on('finish', finishHandler)
