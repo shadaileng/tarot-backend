@@ -317,6 +317,10 @@ export async function unbindEmail(userId: string): Promise<void> {
 export async function softDeleteUser(userId: string): Promise<void> {
   const db = await getDb()
   const now = new Date().toISOString()
+  const user = await findById(userId)
+  if (user && user.email && user.openid) {
+    await unbindEmail(userId)
+  }
   db.run('UPDATE users SET deleted_at = ? WHERE id = ?', [now, userId])
   saveDb()
   log.info({ userId }, 'User soft deleted')
