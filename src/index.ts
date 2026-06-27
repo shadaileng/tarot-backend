@@ -33,6 +33,7 @@ import { checkinHandler, checkinStatusHandler } from './auth/checkin.js'
 import { getTasksHandler, claimTaskHandler } from './auth/tasks.js'
 import { getInviteCodeHandler, getInviteRecordsHandler } from './auth/invite.js'
 import { getUserStatsHandler, getLevelsHandler } from './auth/stats.js'
+import { initMissingUserStats } from './db/user-stats.js'
 import { getUserRecords, getRecordById, saveRecord, deleteRecord } from './db/reading-record.js'
 import {
   findAdminByUsername, updateLastLogin, initAdminIfNeeded, findAdminById, changePassword,
@@ -859,6 +860,9 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 async function start(): Promise<void> {
   await getDb()
   // DB 初始化日志由 src/db/index.ts 的 getDb() 内部输出（含 path + new 标记）
+
+  // 为缺少 user_stats 的老用户补充数据
+  await initMissingUserStats()
 
   const defaults = getConfigDefaults()
   await initDefaultConfig(defaults)

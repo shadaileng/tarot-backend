@@ -252,3 +252,44 @@ export async function getUserLevelInfo(userId: string): Promise<{
     totalReadings: stats.total_readings,
   }
 }
+
+/** 为缺少 user_stats 的老用户补充数据 */
+export async function initMissingUserStats(): Promise<void> {
+  const db = await getDb()
+
+  const users = db.prepare(`
+    SELECT u.id FROM users u
+    LEFT JOIN user_stats s ON u.id = s.user_id
+    WHERE s.user_id IS NULL AND u.deleted_at IS NULL
+  `)
+  const missingIds: string[] = []
+  while (users.step()) {
+    const row = users.getAsObject() as { id: string }
+    missingIds.push(row.id)
+  }
+  users.free()
+
+  if (missingIds.length === 0) return
+
+  const now = new Date().toISOString()
+  for (const userId of missingIds) {
+    let code = generateReferralCode()
+    while (true) {
+      const existing = db.prepare('SELECT 1 FROM user_stats WHERE referral_code = ?')
+      existing.bind([code])
+      if (!existing.step()) {
+        existing.free()
+        break
+      }
+      existing.free()
+      code = generateReferralCode()
+    }
+    db.run(
+      `INSERT INTO user_stats (user_id, points, level, extra_quota, referral_code, invited_by, created_at)
+       VALUES (?, 0, 1, 0, ?, NULL, ?)`,
+      [userId, code, now],
+    )
+  }
+  saveDb()
+  log.info({ count: missingIds.length }, 'Migrated existing users with default stats')
+}
