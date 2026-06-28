@@ -3,7 +3,6 @@
   "version": "2.13.1",
   "description": "塔罗牌后台服务 - AI 解读 + 海报生成",
   "private": true,
-  "packageManager": "pnpm@9.15.0",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
