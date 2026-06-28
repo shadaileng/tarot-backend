@@ -900,6 +900,230 @@ app.put('/api/admin/users/:id/points', adminAuthMiddleware, async (req, res) => 
   }
 })
 
+// ========== 数据维护 API（Admin JWT）==========
+
+app.get('/api/admin/stats/trends', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await getDb()
+    const days = Math.min(parseInt(req.query.days as string) || 30, 365)
+    const since = new Date()
+    since.setDate(since.getDate() - days)
+    const sinceStr = since.toISOString().slice(0, 10)
+
+    function formatDate(d: Date): string {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+
+    const today = new Date()
+    const dateMap = new Map<string, { registration: number; checkin: number; reading: number; invite: number }>()
+    for (let d = new Date(since); d <= today; d.setDate(d.getDate() + 1)) {
+      const key = formatDate(d)
+      dateMap.set(key, { registration: 0, checkin: 0, reading: 0, invite: 0 })
+    }
+
+    const regStmt = db.prepare(`SELECT DATE(created_at) as date, COUNT(*) as count FROM users WHERE created_at >= ? GROUP BY DATE(created_at)`)
+    regStmt.bind([sinceStr])
+    while (regStmt.step()) { const r = regStmt.getAsObject() as any; if (dateMap.has(r.date)) dateMap.get(r.date)!.registration = r.count; else dateMap.set(r.date, { registration: r.count, checkin: 0, reading: 0, invite: 0 }) }
+    regStmt.free()
+
+    const ckStmt = db.prepare(`SELECT checkin_date as date, COUNT(*) as count FROM checkin_records WHERE created_at >= ? GROUP BY checkin_date`)
+    ckStmt.bind([sinceStr])
+    while (ckStmt.step()) { const r = ckStmt.getAsObject() as any; if (dateMap.has(r.date)) dateMap.get(r.date)!.checkin = r.count; else dateMap.set(r.date, { registration: 0, checkin: r.count, reading: 0, invite: 0 }) }
+    ckStmt.free()
+
+    const rdStmt = db.prepare(`SELECT DATE(created_at) as date, COUNT(*) as count FROM reading_logs WHERE target = 'reading' AND created_at >= ? GROUP BY DATE(created_at)`)
+    rdStmt.bind([sinceStr])
+    while (rdStmt.step()) { const r = rdStmt.getAsObject() as any; if (dateMap.has(r.date)) dateMap.get(r.date)!.reading = r.count; else dateMap.set(r.date, { registration: 0, checkin: 0, reading: r.count, invite: 0 }) }
+    rdStmt.free()
+
+    const invStmt = db.prepare(`SELECT DATE(created_at) as date, COUNT(*) as count FROM invite_records WHERE created_at >= ? GROUP BY DATE(created_at)`)
+    invStmt.bind([sinceStr])
+    while (invStmt.step()) { const r = invStmt.getAsObject() as any; if (dateMap.has(r.date)) dateMap.get(r.date)!.invite = r.count; else dateMap.set(r.date, { registration: 0, checkin: 0, reading: 0, invite: r.count }) }
+    invStmt.free()
+
+    const sortedDates = [...dateMap.entries()].sort(([a], [b]) => a.localeCompare(b))
+    const registration = sortedDates.map(([date, v]) => ({ date, count: v.registration }))
+    const checkin = sortedDates.map(([date, v]) => ({ date, count: v.checkin }))
+    const reading = sortedDates.map(([date, v]) => ({ date, count: v.reading }))
+    const invite = sortedDates.map(([date, v]) => ({ date, count: v.invite }))
+
+    const lvStmt = db.prepare(`
+      SELECT s.level, COUNT(*) as count, COALESCE((SELECT title FROM level_definitions WHERE level = s.level), '未知') as title
+      FROM user_stats s GROUP BY s.level ORDER BY s.level ASC
+    `)
+    const levelDistribution: any[] = []
+    while (lvStmt.step()) levelDistribution.push(lvStmt.getAsObject())
+    lvStmt.free()
+
+    const todayStr = formatDate(today)
+    const totalUsers = db.prepare('SELECT COUNT(*) as c FROM users WHERE deleted_at IS NULL').getAsObject() as any
+    const tcStmt = db.prepare('SELECT COUNT(*) as c FROM checkin_records WHERE checkin_date = ?')
+    tcStmt.bind([todayStr]); tcStmt.step(); const tc = (tcStmt.getAsObject() as any).c; tcStmt.free()
+    const totalReadings = db.prepare('SELECT COALESCE(SUM(total_readings),0) as c FROM user_stats').getAsObject() as any
+    const totalInvites = db.prepare("SELECT COUNT(*) as c FROM invite_records WHERE status = 'completed'").getAsObject() as any
+
+    res.json({
+      registration, checkin, reading, invite, levelDistribution,
+      summary: {
+        totalUsers: (totalUsers as any).c,
+        todayCheckins: tc,
+        totalReadings: (totalReadings as any).c,
+        totalInvites: (totalInvites as any).c,
+      },
+    })
+  } catch (err) {
+    log.error({ err }, 'Failed to get stats trends')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取趋势统计失败' })
+  }
+})
+
+app.get('/api/admin/invite-records', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await getDb()
+    const page = parseInt(req.query.page as string) || 1
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100)
+    const offset = (page - 1) * limit
+    const status = req.query.status as string
+    const keyword = (req.query.keyword as string) || ''
+
+    let where = 'WHERE 1=1'
+    const params: any[] = []
+    if (status) { where += ' AND ir.status = ?'; params.push(status) }
+    if (keyword) {
+      where += ' AND (iu.nickname LIKE ? OR eu.nickname LIKE ?)'
+      const like = `%${keyword}%`
+      params.push(like, like)
+    }
+
+    const countStmt = db.prepare(`SELECT COUNT(*) as total FROM invite_records ir ${where}`)
+    countStmt.bind(params)
+    countStmt.step()
+    const total = (countStmt.getAsObject() as any).total
+    countStmt.free()
+
+    const stmt = db.prepare(`
+      SELECT ir.*, iu.nickname as inviter_name, iu.avatar_url as inviter_avatar,
+             eu.nickname as invitee_name, eu.avatar_url as invitee_avatar
+      FROM invite_records ir
+      LEFT JOIN users iu ON ir.inviter_id = iu.id
+      LEFT JOIN users eu ON ir.invitee_id = eu.id
+      ${where} ORDER BY ir.created_at DESC LIMIT ? OFFSET ?
+    `)
+    stmt.bind([...params, limit, offset])
+    const data: any[] = []
+    while (stmt.step()) data.push(stmt.getAsObject())
+    stmt.free()
+    res.json({ total, page, limit, data })
+  } catch (err) {
+    log.error({ err }, 'Failed to get invite records')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取邀请记录失败' })
+  }
+})
+
+app.put('/api/admin/invite-records/:id/complete', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') return res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
+  try {
+    const db = await getDb()
+    const now = new Date().toISOString()
+    const stmt = db.prepare("UPDATE invite_records SET status = 'completed', completed_at = ? WHERE id = ? AND status = 'pending'")
+    stmt.bind([now, req.params.id])
+    stmt.step()
+    stmt.free()
+    saveDb()
+    res.json({ message: '邀请已标记为完成' })
+  } catch (err) {
+    log.error({ err }, 'Failed to complete invite')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '操作失败' })
+  }
+})
+
+app.delete('/api/admin/invite-records/:id', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') return res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
+  try {
+    const db = await getDb()
+    db.run('DELETE FROM invite_records WHERE id = ?', [req.params.id])
+    saveDb()
+    res.json({ message: '邀请记录已删除' })
+  } catch (err) {
+    log.error({ err }, 'Failed to delete invite record')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '操作失败' })
+  }
+})
+
+app.get('/api/admin/checkin-stats', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await getDb()
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+    const todayCount = db.prepare('SELECT COUNT(*) as c FROM checkin_records WHERE checkin_date = ?')
+    todayCount.bind([todayStr])
+    todayCount.step()
+    const todayCheckins = (todayCount.getAsObject() as any).c
+    todayCount.free()
+
+    const totalStmt = db.prepare('SELECT COUNT(*) as c FROM checkin_records')
+    totalStmt.step()
+    const total = (totalStmt.getAsObject() as any).c
+    totalStmt.free()
+
+    const avgStmt = db.prepare('SELECT AVG(points_earned) as avg FROM checkin_records')
+    avgStmt.step()
+    const avgPoints = (avgStmt.getAsObject() as any).avg || 0
+    avgStmt.free()
+
+    if (req.query.detail === '1') {
+      const page = parseInt(req.query.page as string) || 1
+      const limit = Math.min(parseInt(req.query.limit as string) || 20, 100)
+      const offset = (page - 1) * limit
+      const detailStmt = db.prepare(`
+        SELECT cr.*, u.nickname, u.avatar_url
+        FROM checkin_records cr
+        LEFT JOIN users u ON cr.user_id = u.id
+        ORDER BY cr.created_at DESC LIMIT ? OFFSET ?
+      `)
+      detailStmt.bind([limit, offset])
+      const detail: any[] = []
+      while (detailStmt.step()) detail.push(detailStmt.getAsObject())
+      detailStmt.free()
+      res.json({ todayCheckins, total, avgPoints: Math.round(avgPoints * 10) / 10, page, limit, data: detail })
+      return
+    }
+
+    res.json({ todayCheckins, total, avgPoints: Math.round(avgPoints * 10) / 10 })
+  } catch (err) {
+    log.error({ err }, 'Failed to get checkin stats')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取签到统计失败' })
+  }
+})
+
+app.put('/api/admin/users/:id/reset-quota', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') return res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
+  try {
+    const db = await getDb()
+    db.run('UPDATE user_stats SET daily_quota_used = 0 WHERE user_id = ?', [req.params.id])
+    saveDb()
+    res.json({ message: '额度已重置' })
+  } catch (err) {
+    log.error({ err }, 'Failed to reset quota')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '操作失败' })
+  }
+})
+
+app.put('/api/admin/users/:id/clear-invite', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') return res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
+  try {
+    const db = await getDb()
+    db.run("DELETE FROM invite_records WHERE invitee_id = ?", [req.params.id])
+    db.run("UPDATE user_stats SET invited_by = NULL WHERE user_id = ?", [req.params.id])
+    saveDb()
+    res.json({ message: '邀请绑定已清除' })
+  } catch (err) {
+    log.error({ err }, 'Failed to clear invite')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '操作失败' })
+  }
+})
+
 // ========== 用户级占卜记录（JWT 鉴权）==========
 
 app.post('/api/user/records', jwtAuthMiddleware, async (req, res) => {
