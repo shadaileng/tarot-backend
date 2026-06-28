@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - 精简 `rate-limit.ts`：移除日额度逻辑（由 `quotaMiddleware` 统一管理）
 
+### Docs
+
+- 新增 Vitest 测试框架（76 个单元测试），覆盖 DB 层、中间件、Auth handler 三大层面
+- 测试文件：`tests/db/`, `tests/middleware/`, `tests/auth/`
+- 运行方式：`pnpm test`（~1.4s 单次运行，零外部依赖）
+
 ## [2.12.0] - 2026-06-27
 
 ### Added

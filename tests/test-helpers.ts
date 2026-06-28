@@ -1,87 +1,34 @@
 import initSqlJs from 'sql.js'
-import fs from 'fs'
-import path from 'path'
-import { config } from '../config.js'
-import { getLogger } from '../logger.js'
-import type { SqlJsStatic, Database } from 'sql.js'
+import type { Database, SqlJsStatic } from 'sql.js'
 
-const log = getLogger('DB')
-
-let db: Database | null = null
 let SQL: SqlJsStatic | null = null
+let testDb: Database | null = null
 
-async function initSql(): Promise<SqlJsStatic> {
+export async function setupTestDb(): Promise<Database> {
   if (!SQL) {
     SQL = await initSqlJs()
   }
-  return SQL
+  testDb = new SQL.Database()
+  testDb.run('PRAGMA journal_mode=WAL')
+  initTestSchema(testDb)
+  initTestLevelDefinitions(testDb)
+  initTestTaskDefinitions(testDb)
+  return testDb
 }
 
-export function saveDb(): void {
-  const data = db!.export()
-  const dir = path.dirname(config.db.path)
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true })
+export function getTestDb(): Database {
+  if (!testDb) throw new Error('Test DB not initialized — call setupTestDb() first')
+  return testDb
+}
+
+export function teardownTestDb(): void {
+  if (testDb) {
+    testDb.close()
+    testDb = null
   }
-  fs.writeFileSync(config.db.path, Buffer.from(data))
 }
 
-export async function getDb(): Promise<Database> {
-  if (!db) {
-    const sql = await initSql()
-    const existed = fs.existsSync(config.db.path)
-    if (existed) {
-      const buffer = fs.readFileSync(config.db.path)
-      db = new sql.Database(buffer)
-    } else {
-      db = new sql.Database()
-    }
-    db.run('PRAGMA journal_mode=WAL')
-    initSchema(db)
-    initLevelDefinitions()
-    initTaskDefinitions()
-    saveDb()
-    log.info({ path: config.db.path, new: !existed }, 'Database initialized')
-  }
-  return db
-}
-
-function initSchema(database: Database): void {
-  database.run(`
-    CREATE TABLE IF NOT EXISTS reading_logs (
-      id             TEXT PRIMARY KEY,
-      created_at     TEXT NOT NULL,
-      method         TEXT NOT NULL,
-      path           TEXT NOT NULL,
-      target         TEXT NOT NULL,
-      status_code    INTEGER,
-      duration_ms    INTEGER,
-      ip_address     TEXT,
-      question       TEXT,
-      cards_json     TEXT,
-      reading        TEXT,
-      model          TEXT,
-      incomplete     INTEGER DEFAULT 0,
-      is_error       INTEGER DEFAULT 0,
-      error_msg      TEXT,
-      openid         TEXT,
-      user_id        TEXT
-    )
-  `)
-  database.run('CREATE INDEX IF NOT EXISTS idx_logs_created_at ON reading_logs(created_at DESC)')
-  database.run('CREATE INDEX IF NOT EXISTS idx_logs_target ON reading_logs(target)')
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS system_config (
-      key         TEXT PRIMARY KEY,
-      value       TEXT NOT NULL,
-      source      TEXT NOT NULL DEFAULT 'env',
-      updated_at  TEXT NOT NULL
-    )
-  `)
-
-  // ========== 用户系统表 ==========
-
+export function initTestSchema(database: Database): void {
   database.run(`
     CREATE TABLE IF NOT EXISTS users (
       id            TEXT PRIMARY KEY,
@@ -95,81 +42,12 @@ function initSchema(database: Database): void {
       gender        INTEGER DEFAULT 0,
       birthday      TEXT,
       created_at    TEXT NOT NULL,
-      last_login_at TEXT NOT NULL
+      last_login_at TEXT NOT NULL,
+      deleted_at    TEXT
     )
   `)
   database.run('CREATE INDEX IF NOT EXISTS idx_users_openid ON users(openid)')
-  database.run('CREATE INDEX IF NOT EXISTS idx_users_unionid ON users(unionid)')
-  database.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL AND email != \'\'')
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS reading_records (
-      id          TEXT PRIMARY KEY,
-      user_id     TEXT NOT NULL,
-      created_at  TEXT NOT NULL,
-      spread_type TEXT NOT NULL,
-      question    TEXT,
-      cards_json  TEXT NOT NULL,
-      reading     TEXT NOT NULL,
-      model       TEXT,
-      is_local    INTEGER DEFAULT 0,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    )
-  `)
-  database.run('CREATE INDEX IF NOT EXISTS idx_records_user_id ON reading_records(user_id)')
-  database.run('CREATE INDEX IF NOT EXISTS idx_records_created_at ON reading_records(created_at DESC)')
-
-  // ========== 管理员表 ==========
-
-  database.run(`
-    CREATE TABLE IF NOT EXISTS admins (
-      id                  TEXT PRIMARY KEY,
-      username            TEXT NOT NULL UNIQUE,
-      password_hash       TEXT NOT NULL,
-      display_name        TEXT NOT NULL DEFAULT '',
-      role                TEXT NOT NULL DEFAULT 'admin',
-      created_at          TEXT NOT NULL,
-      last_login_at       TEXT,
-      is_active           INTEGER NOT NULL DEFAULT 1,
-      must_change_password INTEGER NOT NULL DEFAULT 0
-    )
-  `)
-  database.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_admins_username ON admins(username)')
-
-  // 兼容已有数据库：为 admins 表新增 must_change_password 列
-  try {
-    database.run('ALTER TABLE admins ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0')
-  } catch {
-    // 列已存在时静默忽略（SQLite 不支持 IF NOT EXISTS for ALTER TABLE）
-  }
-
-  // 兼容已有数据库：为 reading_logs 新增 user_id 列
-  try {
-    database.run('ALTER TABLE reading_logs ADD COLUMN user_id TEXT')
-  } catch {
-    // 列已存在时静默忽略（SQLite 不支持 IF NOT EXISTS for ALTER TABLE）
-  }
-
-  // 兼容已有数据库：为 users 表新增 gender / birthday 列
-  try {
-    database.run('ALTER TABLE users ADD COLUMN gender INTEGER DEFAULT 0')
-  } catch {}
-  try {
-    database.run('ALTER TABLE users ADD COLUMN birthday TEXT')
-  } catch {}
-
-  // 兼容已有数据库：软删除支持
-  try {
-    database.run('ALTER TABLE users ADD COLUMN deleted_at TEXT')
-  } catch {}
-
-  // 更新邮箱唯一索引以支持软删除（排除已删除用户）
-  try {
-    database.run('DROP INDEX IF EXISTS idx_users_email')
-  } catch {}
   database.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL AND email != '' AND deleted_at IS NULL`)
-
-  // ========== 积分等级相关表 ==========
 
   database.run(`
     CREATE TABLE IF NOT EXISTS user_stats (
@@ -261,15 +139,8 @@ function initSchema(database: Database): void {
   `)
 }
 
-/** 初始化 level_definitions 默认数据 */
-export function initLevelDefinitions(): void {
-  if (!db) return
-
-  // 兼容已有数据库：为 user_stats 新增 created_at 列
-  try {
-    db.run('ALTER TABLE user_stats ADD COLUMN created_at TEXT')
-  } catch {}
-  const stmt = db.prepare(`
+function initTestLevelDefinitions(database: Database): void {
+  const stmt = database.prepare(`
     INSERT OR IGNORE INTO level_definitions (level, title, points_required, daily_quota, max_extra_quota)
     VALUES (?, ?, ?, ?, ?)
   `)
@@ -280,7 +151,7 @@ export function initLevelDefinitions(): void {
     [4, '高级塔罗师', 600, 20, 50],
     [5, '资深塔罗师', 1000, 35, 80],
     [6, '大师塔罗师', 2000, 50, 120],
-  ]
+  ] as any[]
   for (const lv of levels) {
     stmt.bind(lv)
     stmt.step()
@@ -289,10 +160,8 @@ export function initLevelDefinitions(): void {
   stmt.free()
 }
 
-/** 初始化 task_definitions 默认数据 */
-export function initTaskDefinitions(): void {
-  if (!db) return
-  const stmt = db.prepare(`
+function initTestTaskDefinitions(database: Database): void {
+  const stmt = database.prepare(`
     INSERT OR IGNORE INTO task_definitions (id, title, description, type, requirement_type, requirement_count, points_reward, extra_quota_reward, sort_order)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
@@ -314,10 +183,27 @@ export function initTaskDefinitions(): void {
   stmt.free()
 }
 
-export function closeDb(): void {
-  if (db) {
-    saveDb()
-    db.close()
-    db = null
-  }
+export function insertTestUser(database: Database, id: string, email?: string): void {
+  const now = new Date().toISOString()
+  database.run(
+    `INSERT OR IGNORE INTO users (id, openid, email, nickname, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, 'test-openid', email || null, 'TestUser', now, now],
+  )
+}
+
+export function getTodayDate(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+export function getYesterdayDate(): string {
+  const d = new Date()
+  d.setDate(d.getDate() - 1)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }

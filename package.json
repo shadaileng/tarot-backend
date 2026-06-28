@@ -9,7 +9,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc && cp -r src/poster/templates/*.html src/poster/templates/*.css dist/poster/templates/",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -32,6 +33,7 @@
     "@types/sql.js": "^1.4.11",
     "@types/uuid": "^11.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.4.2"
+    "typescript": "^5.4.2",
+    "vitest": "^4.1.9"
   }
 }
