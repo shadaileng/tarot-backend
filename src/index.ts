@@ -31,7 +31,7 @@ import { updateProfileHandler } from './auth/update-profile.js'
 import { getProfileHandler } from './auth/get-profile.js'
 import { checkinHandler, checkinStatusHandler } from './auth/checkin.js'
 import { getTasksHandler, claimTaskHandler } from './auth/tasks.js'
-import { getInviteCodeHandler, getInviteRecordsHandler } from './auth/invite.js'
+import { getInviteCodeHandler, getInviteRecordsHandler, bindReferralHandler } from './auth/invite.js'
 import { getUserStatsHandler, getLevelsHandler } from './auth/stats.js'
 import { initMissingUserStats } from './db/user-stats.js'
 import { getUserRecords, getRecordById, saveRecord, deleteRecord } from './db/reading-record.js'
@@ -188,6 +188,7 @@ app.post('/api/tasks/:id/claim', jwtAuthMiddleware, claimTaskHandler)
 // 邀请（需要 JWT 鉴权）
 app.get('/api/invite/code', jwtAuthMiddleware, getInviteCodeHandler)
 app.get('/api/invite/records', jwtAuthMiddleware, getInviteRecordsHandler)
+app.post('/api/user/bind-referral', jwtAuthMiddleware, bindReferralHandler)
 
 // 统计（需要 JWT 鉴权）
 app.get('/api/user/stats', jwtAuthMiddleware, getUserStatsHandler)

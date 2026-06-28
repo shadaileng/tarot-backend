@@ -158,6 +158,23 @@ export async function addPoints(userId: string, delta: number): Promise<{ newPoi
   return { newPoints: Math.max(0, newPoints), newLevel: newLevelDef.level, leveledUp }
 }
 
+/** 设置用户的 invited_by（绑定邀请码） */
+export async function updateInvitedBy(userId: string, referralCode: string): Promise<{ success: boolean; error?: string }> {
+  const db = await getDb()
+
+  const inviter = await findByReferralCode(referralCode)
+  if (!inviter) return { success: false, error: 'INVITE_CODE_NOT_FOUND' }
+  if (inviter.user_id === userId) return { success: false, error: 'CANNOT_INVITE_SELF' }
+
+  const stats = await getUserStats(userId)
+  if (!stats) return { success: false, error: 'USER_STATS_NOT_FOUND' }
+  if (stats.invited_by) return { success: false, error: 'ALREADY_INVITED' }
+
+  db.run('UPDATE user_stats SET invited_by = ? WHERE user_id = ?', [referralCode, userId])
+  saveDb()
+  return { success: true }
+}
+
 /** 增加占卜计数 */
 export async function incrementReadings(userId: string): Promise<void> {
   const db = await getDb()
