@@ -73,6 +73,31 @@ export async function getReferralCode(userId: string): Promise<string | null> {
   return null
 }
 
+/** 获取我的邀请人信息 */
+export async function getMyInviter(userId: string): Promise<{ referralCode: string; nickname: string; avatarUrl: string | null } | null> {
+  const db = await getDb()
+
+  const stats = db.prepare('SELECT invited_by FROM user_stats WHERE user_id = ?')
+  stats.bind([userId])
+  if (!stats.step()) { stats.free(); return null }
+  const row = stats.getAsObject() as { invited_by: string | null }
+  stats.free()
+  if (!row.invited_by) return null
+
+  const inviter = db.prepare(`
+    SELECT s.user_id, u.nickname, u.avatar_url
+    FROM user_stats s
+    LEFT JOIN users u ON s.user_id = u.id
+    WHERE s.referral_code = ?
+  `)
+  inviter.bind([row.invited_by])
+  if (!inviter.step()) { inviter.free(); return null }
+  const inviterRow = inviter.getAsObject() as { user_id: string; nickname: string; avatar_url: string | null }
+  inviter.free()
+
+  return { referralCode: row.invited_by, nickname: inviterRow.nickname || '匿名用户', avatarUrl: inviterRow.avatar_url }
+}
+
 /** 获取用户的邀请记录 */
 export async function getInviteRecords(userId: string): Promise<any[]> {
   const db = await getDb()

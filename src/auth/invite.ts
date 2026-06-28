@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express'
 import { getLogger } from '../logger.js'
 import { updateInvitedBy } from '../db/user-stats.js'
-import { getReferralCode, getInviteRecords, completeInvite } from '../db/invite.js'
+import { getReferralCode, getInviteRecords, getMyInviter, completeInvite } from '../db/invite.js'
 
 const log = getLogger('Auth:Invite')
 
@@ -31,8 +31,11 @@ export async function getInviteCodeHandler(req: Request, res: Response): Promise
 export async function getInviteRecordsHandler(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.userId!
-    const records = await getInviteRecords(userId)
-    res.json({ records })
+    const [records, inviter] = await Promise.all([
+      getInviteRecords(userId),
+      getMyInviter(userId),
+    ])
+    res.json({ records, inviter })
   } catch (err) {
     log.error({ err, userId: req.userId }, 'Get invite records failed')
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取邀请记录失败' })
