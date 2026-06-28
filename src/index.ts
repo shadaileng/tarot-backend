@@ -21,7 +21,7 @@ import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } f
 import { queryLogs, getLogById } from './db/reading-log.js'
 import { queryUsers, unbindEmail, softDeleteUser, restoreUser } from './db/user.js'
 import { getAllConfig, upsertConfig, initDefaultConfig, loadUserConfig } from './db/config.js'
-import { getDb } from './db/index.js'
+import { getDb, saveDb } from './db/index.js'
 import { wechatLoginHandler } from './auth/wechat-login.js'
 import { emailRegisterHandler } from './auth/email-register.js'
 import { emailLoginHandler } from './auth/email-login.js'
@@ -707,6 +707,195 @@ app.put('/api/admin/users/:id/restore', adminAuthMiddleware, async (req, res) =>
     res.json({ message: '用户已恢复' })
   } catch (err) {
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '操作失败' })
+  }
+})
+
+// ========== 积分等级体系管理后台 API（Admin JWT）==========
+
+app.get('/api/admin/level-definitions', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const db = await getDb()
+    const stmt = db.prepare('SELECT * FROM level_definitions ORDER BY level ASC')
+    const levels: any[] = []
+    while (stmt.step()) levels.push(stmt.getAsObject())
+    stmt.free()
+    res.json({ levels })
+  } catch (err) {
+    log.error({ err }, 'Failed to get level definitions')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取等级配置失败' })
+  }
+})
+
+app.put('/api/admin/level-definitions/:level', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改配置' })
+    return
+  }
+  try {
+    const db = await getDb()
+    const { title, points_required, daily_quota, max_extra_quota } = req.body as any
+    const level = parseInt(req.params.level)
+
+    if (!title || points_required === undefined || daily_quota === undefined) {
+      res.status(400).json({ error: 'INVALID_INPUT', message: 'title, points_required, daily_quota 为必填项' })
+      return
+    }
+
+    db.run(
+      'UPDATE level_definitions SET title = ?, points_required = ?, daily_quota = ?, max_extra_quota = ? WHERE level = ?',
+      [title, points_required, daily_quota, max_extra_quota ?? 100, level],
+    )
+    saveDb()
+    res.json({ message: '等级配置已更新' })
+  } catch (err) {
+    log.error({ err }, 'Failed to update level definition')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '更新等级配置失败' })
+  }
+})
+
+app.get('/api/admin/task-definitions', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const db = await getDb()
+    const stmt = db.prepare('SELECT * FROM task_definitions ORDER BY sort_order ASC')
+    const tasks: any[] = []
+    while (stmt.step()) tasks.push(stmt.getAsObject())
+    stmt.free()
+    res.json({ tasks })
+  } catch (err) {
+    log.error({ err }, 'Failed to get task definitions')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取任务定义失败' })
+  }
+})
+
+app.post('/api/admin/task-definitions', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改配置' })
+    return
+  }
+  try {
+    const db = await getDb()
+    const { id, title, description, type, requirement_type, requirement_count, points_reward, extra_quota_reward, icon, sort_order } = req.body as any
+
+    if (!id || !title || !type || !requirement_type || requirement_count === undefined) {
+      res.status(400).json({ error: 'INVALID_INPUT', message: 'id, title, type, requirement_type, requirement_count 为必填项' })
+      return
+    }
+
+    db.run(
+      `INSERT INTO task_definitions (id, title, description, type, requirement_type, requirement_count, points_reward, extra_quota_reward, icon, sort_order, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+      [id, title, description || null, type, requirement_type, requirement_count, points_reward || 0, extra_quota_reward || 0, icon || null, sort_order || 0],
+    )
+    saveDb()
+    res.status(201).json({ message: '任务定义已创建' })
+  } catch (err: any) {
+    if (err.message?.includes('UNIQUE')) {
+      res.status(409).json({ error: 'CONFLICT', message: '任务 ID 已存在' })
+      return
+    }
+    log.error({ err }, 'Failed to create task definition')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '创建任务定义失败' })
+  }
+})
+
+app.put('/api/admin/task-definitions/:id', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改配置' })
+    return
+  }
+  try {
+    const db = await getDb()
+    const fields = ['title', 'description', 'type', 'requirement_type', 'requirement_count', 'points_reward', 'extra_quota_reward', 'icon', 'sort_order', 'is_active'] as const
+    const updates: string[] = []
+    const values: any[] = []
+    const body = req.body as any
+
+    for (const field of fields) {
+      if (body[field] !== undefined) {
+        updates.push(`${field} = ?`)
+        values.push(body[field])
+      }
+    }
+
+    if (updates.length === 0) {
+      res.status(400).json({ error: 'INVALID_INPUT', message: '没有需要更新的字段' })
+      return
+    }
+
+    values.push(req.params.id)
+    db.run(`UPDATE task_definitions SET ${updates.join(', ')} WHERE id = ?`, values)
+    saveDb()
+    res.json({ message: '任务定义已更新' })
+  } catch (err) {
+    log.error({ err }, 'Failed to update task definition')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '更新任务定义失败' })
+  }
+})
+
+app.get('/api/admin/user-stats', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await getDb()
+    const page = parseInt(req.query.page as string) || 1
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 100)
+    const keyword = (req.query.keyword as string) || ''
+    const offset = (page - 1) * limit
+
+    let whereClause = 'WHERE s.user_id IS NOT NULL'
+    const params: any[] = []
+    if (keyword) {
+      whereClause += ' AND (u.nickname LIKE ? OR u.email LIKE ? OR u.id LIKE ?)'
+      const like = `%${keyword}%`
+      params.push(like, like, like)
+    }
+
+    const countStmt = db.prepare(`
+      SELECT COUNT(*) as total FROM user_stats s
+      LEFT JOIN users u ON s.user_id = u.id
+      ${whereClause}
+    `)
+    countStmt.bind(params)
+    countStmt.step()
+    const total = (countStmt.getAsObject() as any).total
+    countStmt.free()
+
+    const stmt = db.prepare(`
+      SELECT s.*, u.nickname, u.email,
+        (SELECT title FROM level_definitions WHERE level = s.level) as level_title
+      FROM user_stats s
+      LEFT JOIN users u ON s.user_id = u.id
+      ${whereClause}
+      ORDER BY s.points DESC
+      LIMIT ? OFFSET ?
+    `)
+    stmt.bind([...params, limit, offset])
+    const data: any[] = []
+    while (stmt.step()) data.push(stmt.getAsObject())
+    stmt.free()
+
+    res.json({ total, page, limit, data })
+  } catch (err) {
+    log.error({ err }, 'Failed to get user stats')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取用户统计失败' })
+  }
+})
+
+app.put('/api/admin/users/:id/points', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改配置' })
+    return
+  }
+  try {
+    const { addPoints } = await import('./db/user-stats.js')
+    const { delta } = req.body as { delta: number }
+    if (typeof delta !== 'number') {
+      res.status(400).json({ error: 'INVALID_INPUT', message: 'delta 必须为数字' })
+      return
+    }
+    const result = await addPoints(req.params.id, delta)
+    res.json({ newPoints: result.newPoints, newLevel: result.newLevel, leveledUp: result.leveledUp })
+  } catch (err) {
+    log.error({ err }, 'Failed to adjust points')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '调整积分失败' })
   }
 })
 
