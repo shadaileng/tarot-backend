@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express'
 import { getLogger } from '../logger.js'
 import { updateInvitedBy } from '../db/user-stats.js'
-import { getReferralCode, getInviteRecords, getMyInviter, completeInvite } from '../db/invite.js'
+import { getReferralCode, getInviteRecords, getMyInviter, createPendingInvite } from '../db/invite.js'
 
 const log = getLogger('Auth:Invite')
 
@@ -74,11 +74,7 @@ export async function bindReferralHandler(req: Request, res: Response): Promise<
       return
     }
 
-    const { getUserStats } = await import('../db/user-stats.js')
-    const stats = await getUserStats(userId)
-    if (stats && stats.total_readings > 0) {
-      await completeInvite(userId)
-    }
+    await createPendingInvite(userId)
 
     log.info({ userId, referralCode }, 'Referral code bound')
     res.json({ success: true, message: '邀请码绑定成功' })

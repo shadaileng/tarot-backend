@@ -5,6 +5,42 @@ import { advanceTaskProgress } from './tasks.js'
 
 const log = getLogger('DB:Invite')
 
+/** 创建待完成的邀请记录（绑定邀请码时调用） */
+export async function createPendingInvite(inviteeId: string): Promise<void> {
+  const db = await getDb()
+
+  const stats = db.prepare('SELECT invited_by FROM user_stats WHERE user_id = ?')
+  stats.bind([inviteeId])
+  if (!stats.step()) { stats.free(); return }
+  const row = stats.getAsObject() as { invited_by: string | null }
+  stats.free()
+
+  if (!row.invited_by) return
+
+  const inviter = db.prepare('SELECT user_id FROM user_stats WHERE referral_code = ?')
+  inviter.bind([row.invited_by])
+  if (!inviter.step()) { inviter.free(); return }
+  const inviterRow = inviter.getAsObject() as { user_id: string }
+  inviter.free()
+
+  const inviterId = inviterRow.user_id
+  if (inviterId === inviteeId) return
+
+  const existing = db.prepare('SELECT 1 FROM invite_records WHERE inviter_id = ? AND invitee_id = ?')
+  existing.bind([inviterId, inviteeId])
+  if (existing.step()) { existing.free(); return }
+  existing.free()
+
+  const now = new Date().toISOString()
+  const id = uuidv4()
+  db.run(
+    'INSERT INTO invite_records (id, inviter_id, invitee_id, status, completed_at, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [id, inviterId, inviteeId, 'pending', null, now],
+  )
+  saveDb()
+  log.info({ inviterId, inviteeId }, 'Pending invite record created')
+}
+
 /** 标记邀请为已完成（被邀请人首次占卜时调用） */
 export async function completeInvite(inviteeId: string): Promise<void> {
   const db = await getDb()
