@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 import express, { type Request, type Response, type NextFunction } from 'express'
 import { config, configMeta, updateConfig, maskSensitiveValue, getConfigDefaults } from './config.js'
@@ -42,7 +43,17 @@ import {
 } from './db/admin.js'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcrypt'
+import multer from 'multer'
 import type { PosterData } from './poster/types.js'
+import {
+  handleCreateFeedback,
+  handleGetMyFeedback,
+  handleGetFeedbackDetail,
+  handleAdminListFeedback,
+  handleAdminGetDetail,
+  handleAdminReply,
+  handleAdminUpdateStatus,
+} from './feedback/handler.js'
 
 const log = getLogger('API')
 
@@ -55,6 +66,7 @@ app.use(express.json({ limit: '1mb' }))
 app.use(corsMiddleware)
 
 app.use('/api/cards', express.static(path.join(__dirname, '../assets/cards')))
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
 app.use(loggingMiddleware)
 
@@ -1282,6 +1294,68 @@ app.put('/api/config/:key', adminAuthMiddleware, async (req, res) => {
   log.info({ key, value: meta.sensitive ? '***' : stringValue }, 'Config updated')
 
   res.json({ key, value: meta.sensitive ? maskSensitiveValue(key, stringValue) : stringValue, source: 'user' })
+})
+
+// ========== 意见反馈（JWT 鉴权）==========
+
+app.post('/api/feedback', jwtAuthMiddleware, handleCreateFeedback)
+app.get('/api/feedback', jwtAuthMiddleware, handleGetMyFeedback)
+app.get('/api/feedback/:id', jwtAuthMiddleware, handleGetFeedbackDetail)
+
+// ========== 意见反馈管理（Admin JWT 鉴权）==========
+
+app.get('/api/admin/feedback', adminAuthMiddleware, handleAdminListFeedback)
+app.get('/api/admin/feedback/:id', adminAuthMiddleware, handleAdminGetDetail)
+app.post('/api/admin/feedback/:id/reply', adminAuthMiddleware, handleAdminReply)
+app.put('/api/admin/feedback/:id/status', adminAuthMiddleware, handleAdminUpdateStatus)
+
+// ========== 图片上传（JWT 鉴权）==========
+
+const uploadStorage = multer.diskStorage({
+  destination: (_req: any, _file: any, cb: (err: Error | null, dest: string) => void) => {
+    const dir = path.join(__dirname, '../uploads/feedback')
+    fs.mkdirSync(dir, { recursive: true })
+    cb(null, dir)
+  },
+  filename: (_req: any, file: any, cb: (err: Error | null, name: string) => void) => {
+    const ext = path.extname(file.originalname) || '.jpg'
+    cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`)
+  },
+})
+
+const upload = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req: any, _file: any, cb: any) => {
+    if (!_file.mimetype.startsWith('image/')) {
+      cb(new Error('只能上传图片文件'), false)
+      return
+    }
+    cb(null, true)
+  },
+})
+
+app.post('/api/upload/feedback', jwtAuthMiddleware, (req: Request, res: Response) => {
+  upload.array('images', 3)(req, res, (err: any) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          res.status(400).json({ error: 'FILE_TOO_LARGE', message: '图片大小不能超过 5MB' })
+          return
+        }
+        if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+          res.status(400).json({ error: 'TOO_MANY_FILES', message: '最多上传 3 张图片' })
+          return
+        }
+      }
+      res.status(400).json({ error: 'UPLOAD_ERROR', message: err.message || '上传失败' })
+      return
+    }
+
+    const files = (req as any).files as any[]
+    const urls = files.map((f: any) => `/uploads/feedback/${f.filename}`)
+    res.json({ urls })
+  })
 })
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

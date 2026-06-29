@@ -264,6 +264,28 @@ function initSchema(database: Database): void {
       UNIQUE(user_id, task_id)
     )
   `)
+
+  // ========== 意见反馈表 ==========
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS feedback (
+      id            TEXT PRIMARY KEY,
+      user_id       TEXT NOT NULL,
+      category      TEXT NOT NULL DEFAULT 'other',
+      content       TEXT NOT NULL,
+      images        TEXT,
+      status        TEXT NOT NULL DEFAULT 'pending',
+      admin_reply   TEXT,
+      replied_at    TEXT,
+      replied_by    TEXT,
+      created_at    TEXT NOT NULL,
+      updated_at    TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `)
+  database.run('CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback(user_id)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at DESC)')
 }
 
 /** 初始化 level_definitions 默认数据 */
