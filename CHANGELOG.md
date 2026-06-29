@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.14.0] - 2026-06-29
+
+### Added
+
+- 占卜记录数据库表 `reading_records` 新增 `interpretation` 字段，支持保存解读文本
+- `POST /api/user/records` 接口支持传入 `interpretation` 参数
+
 ## [2.13.1] - 2026-06-28
 
 ### Fixed

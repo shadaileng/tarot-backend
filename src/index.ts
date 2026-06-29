@@ -1127,13 +1127,14 @@ app.put('/api/admin/users/:id/clear-invite', adminAuthMiddleware, async (req, re
 // ========== 用户级占卜记录（JWT 鉴权）==========
 
 app.post('/api/user/records', jwtAuthMiddleware, async (req, res) => {
-  const { spreadType, question, cardsJson, reading, model, isLocal } = req.body as {
+  const { spreadType, question, cardsJson, reading, model, isLocal, interpretation } = req.body as {
     spreadType: string
     question?: string
     cardsJson: string
     reading: string
     model?: string
     isLocal?: boolean
+    interpretation?: string
   }
 
   if (!spreadType || !cardsJson) {
@@ -1150,6 +1151,7 @@ app.post('/api/user/records', jwtAuthMiddleware, async (req, res) => {
       reading: reading || '',
       model: model || null,
       isLocal,
+      interpretation: interpretation || null,
     })
     res.status(201).json(record)
   } catch (err) {

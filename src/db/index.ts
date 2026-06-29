@@ -158,6 +158,11 @@ function initSchema(database: Database): void {
     database.run('ALTER TABLE users ADD COLUMN birthday TEXT')
   } catch {}
 
+  // 兼容已有数据库：为 reading_records 新增 interpretation 列
+  try {
+    database.run('ALTER TABLE reading_records ADD COLUMN interpretation TEXT')
+  } catch {}
+
   // 兼容已有数据库：软删除支持
   try {
     database.run('ALTER TABLE users ADD COLUMN deleted_at TEXT')

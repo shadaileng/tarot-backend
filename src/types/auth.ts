@@ -57,6 +57,7 @@ export interface ReadingRecord {
   reading: string
   model: string | null
   is_local: number
+  interpretation: string | null
 }
 
 /** 登录/注册响应 */

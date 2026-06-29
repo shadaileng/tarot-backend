@@ -15,6 +15,7 @@ interface SaveRecordParams {
   reading: string
   model?: string | null
   isLocal?: boolean
+  interpretation?: string | null
 }
 
 /** 保存一条占卜记录 */
@@ -24,8 +25,8 @@ export async function saveRecord(params: SaveRecordParams): Promise<ReadingRecor
   const id = uuidv4()
 
   db.run(
-    `INSERT INTO reading_records (id, user_id, created_at, spread_type, question, cards_json, reading, model, is_local)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO reading_records (id, user_id, created_at, spread_type, question, cards_json, reading, model, is_local, interpretation)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       params.userId,
@@ -36,6 +37,7 @@ export async function saveRecord(params: SaveRecordParams): Promise<ReadingRecor
       params.reading,
       params.model || null,
       params.isLocal ? 1 : 0,
+      params.interpretation || null,
     ]
   )
   saveDb()
