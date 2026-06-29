@@ -1,6 +1,6 @@
 {
   "name": "tarot-backend",
-  "version": "2.14.0",
+  "version": "2.15.0",
   "description": "塔罗牌后台服务 - AI 解读 + 海报生成",
   "private": true,
   "type": "module",

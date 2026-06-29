@@ -91,6 +91,27 @@ export async function getRecordById(userId: string, recordId: string): Promise<R
   return null
 }
 
+// ==================== 更新 ====================
+
+/** 更新记录的解读文本 */
+export async function updateRecordInterpretation(
+  userId: string,
+  recordId: string,
+  interpretation: string
+): Promise<boolean> {
+  const db = await getDb()
+  const existing = await getRecordById(userId, recordId)
+  if (!existing) return false
+
+  db.run(
+    'UPDATE reading_records SET interpretation = ? WHERE id = ? AND user_id = ?',
+    [interpretation, recordId, userId]
+  )
+  saveDb()
+  log.debug({ id: recordId, userId }, 'Record interpretation updated')
+  return true
+}
+
 // ==================== 删除 ====================
 
 /** 删除单条记录 */

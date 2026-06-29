@@ -34,7 +34,7 @@ import { getTasksHandler, claimTaskHandler } from './auth/tasks.js'
 import { getInviteCodeHandler, getInviteRecordsHandler, bindReferralHandler } from './auth/invite.js'
 import { getUserStatsHandler, getLevelsHandler } from './auth/stats.js'
 import { initMissingUserStats } from './db/user-stats.js'
-import { getUserRecords, getRecordById, saveRecord, deleteRecord } from './db/reading-record.js'
+import { getUserRecords, getRecordById, saveRecord, deleteRecord, updateRecordInterpretation } from './db/reading-record.js'
 import {
   findAdminByUsername, updateLastLogin, initAdminIfNeeded, findAdminById, changePassword,
   createAdmin, listAdmins, updateAdmin, deleteAdmin, resetAdminPassword, validatePasswordStrength,
@@ -1173,6 +1173,22 @@ app.get('/api/user/records/:id', jwtAuthMiddleware, async (req, res) => {
     return
   }
   res.json(record)
+})
+
+app.patch('/api/user/records/:id', jwtAuthMiddleware, async (req, res) => {
+  const { interpretation } = req.body as { interpretation?: string }
+
+  if (interpretation === undefined) {
+    res.status(400).json({ error: 'INVALID_INPUT', message: 'interpretation 为必填项' })
+    return
+  }
+
+  const updated = await updateRecordInterpretation(req.userId!, req.params.id, interpretation)
+  if (!updated) {
+    res.status(404).json({ error: 'Record not found' })
+    return
+  }
+  res.json({ message: '更新成功' })
 })
 
 app.delete('/api/user/records/:id', jwtAuthMiddleware, async (req, res) => {
