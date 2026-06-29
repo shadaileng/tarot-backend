@@ -14,6 +14,9 @@ const log = getLogger('Template')
 /** assets/cards 目录的绝对路径 */
 const CARDS_DIR = path.resolve(import.meta.dirname, '../../assets/cards')
 
+/** assets 目录下小程序码图片的绝对路径 */
+const MINI_CODE_PATH = path.resolve(import.meta.dirname, '../../assets/mpcode.png')
+
 /** 从 card.image 中提取文件名，读取 SVG 并转为 Base64 Data URI（零网络依赖） */
 function resolveCardImage(card: PosterCardInput): string {
   const fileName = card.image.split('/').pop() || ''
@@ -29,6 +32,18 @@ function resolveCardImage(card: PosterCardInput): string {
     const placeholderSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="160" height="260" viewBox="0 0 160 260"><rect width="160" height="260" fill="#2a2a3e"/><text x="80" y="130" text-anchor="middle" fill="#555" font-size="14" font-family="sans-serif">暂无图片</text></svg>`
     const base64 = Buffer.from(placeholderSvg).toString('base64')
     return `data:image/svg+xml;base64,${base64}`
+  }
+}
+
+/** 读取小程序码 PNG 并转为 Base64 Data URI（零网络依赖） */
+function resolveMiniCodeImage(): string {
+  try {
+    const pngBuffer = fs.readFileSync(MINI_CODE_PATH)
+    const base64 = pngBuffer.toString('base64')
+    return `data:image/png;base64,${base64}`
+  } catch (err) {
+    log.error({ err, filePath: MINI_CODE_PATH }, 'Failed to read mini code image')
+    return ''
   }
 }
 
@@ -93,12 +108,15 @@ export function buildPosterHTML(data: PosterData): string {
   const theme = getTheme(data.theme || template.defaultTheme)
   const themeCSSVars = themeToCSSVars(theme)
 
+  const miniCode = resolveMiniCodeImage()
+
   return renderTemplate(template.html, template.css, {
     spreadName: data.spreadName,
     date: data.date,
     questionHTML,
     cardsHTML,
     interpretationHTML,
+    miniCode,
   }, themeCSSVars)
 }
 

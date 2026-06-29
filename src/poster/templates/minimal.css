@@ -216,6 +216,15 @@ body {
   opacity: 0.6;
 }
 
+.footer-qrcode {
+  width: 100px;
+  height: 100px;
+  margin: 16px auto;
+  display: block;
+  border-radius: 12px;
+  border: 1px solid var(--t-color-border);
+}
+
 /* 海报就绪标记（Puppeteer 等待此选择器） */
 .poster-ready {
   opacity: 1;
