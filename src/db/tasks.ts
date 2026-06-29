@@ -76,6 +76,17 @@ export async function getUserTasks(userId: string): Promise<any[]> {
   const db = await getDb()
   const today = getTodayDate()
 
+  // 检查用户是否有任务记录，没有则自动初始化（兼容旧用户）
+  const countStmt = db.prepare('SELECT COUNT(*) as cnt FROM user_tasks WHERE user_id = ?')
+  countStmt.bind([userId])
+  countStmt.step()
+  const count = (countStmt.getAsObject() as { cnt: number }).cnt
+  countStmt.free()
+
+  if (count === 0) {
+    await initUserTasks(userId)
+  }
+
   // 每日任务重置
   db.run(
     `UPDATE user_tasks SET progress = 0, is_completed = 0

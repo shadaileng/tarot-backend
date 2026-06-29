@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.15.1] - 2026-06-29
+
+### Fixed
+
+- 修复旧用户访问任务中心无任务的问题（任务系统上线前注册的用户不会自动初始化任务）
+
 ## [2.15.0] - 2026-06-29
 
 ### Added
