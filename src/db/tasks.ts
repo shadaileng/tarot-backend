@@ -89,7 +89,7 @@ export async function getUserTasks(userId: string): Promise<any[]> {
 
   // 每日任务重置
   db.run(
-    `UPDATE user_tasks SET progress = 0, is_completed = 0
+    `UPDATE user_tasks SET progress = 0, is_completed = 0, reward_claimed = 0, claimed_at = NULL
      WHERE user_id = ? AND reset_date IS NOT NULL AND reset_date != ?`,
     [userId, today],
   )
