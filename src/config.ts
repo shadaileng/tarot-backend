@@ -28,9 +28,9 @@ export const configMeta: ConfigMeta[] = [
 
   { key: 'LOG_RETENTION_DAYS', envKey: 'LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '30' },
 
-  { key: 'WECHAT_APPID',  envKey: 'WECHAT_APPID',  group: '微信配置', editable: false, sensitive: false, type: 'string', defaultValue: '' },
-  { key: 'WECHAT_SECRET', envKey: 'WECHAT_SECRET', group: '微信配置', editable: false, sensitive: true,  type: 'string', defaultValue: '' },
-  { key: 'JWT_SECRET',    envKey: 'JWT_SECRET',    group: '安全配置', editable: false, sensitive: true,  type: 'string', defaultValue: '' },
+  { key: 'WECHAT_APPID',  envKey: 'WECHAT_APPID',  group: '微信配置', editable: true, sensitive: false, type: 'string', defaultValue: '' },
+  { key: 'WECHAT_SECRET', envKey: 'WECHAT_SECRET', group: '微信配置', editable: true, sensitive: true,  type: 'string', defaultValue: '' },
+  { key: 'JWT_SECRET',    envKey: 'JWT_SECRET',    group: '安全配置', editable: true, sensitive: true,  type: 'string', defaultValue: '' },
 
   { key: 'ADMIN_ACCESS_EXPIRES_IN', envKey: 'ADMIN_ACCESS_EXPIRES_IN', group: '安全配置', editable: true, type: 'string', defaultValue: '2h' },
   { key: 'ADMIN_REFRESH_EXPIRES_IN', envKey: 'ADMIN_REFRESH_EXPIRES_IN', group: '安全配置', editable: true, type: 'string', defaultValue: '30d' },

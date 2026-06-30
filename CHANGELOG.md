@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.16.1] - 2026-06-30
 
+### Added
+
+- 启用 `WECHAT_APPID`、`WECHAT_SECRET`、`JWT_SECRET` 的动态配置，支持通过管理后台运行时更新
+
 ### Fixed
 
 - 修复每日任务重置时未重置 `reward_claimed` 字段导致次日仍显示"已领取"的问题
