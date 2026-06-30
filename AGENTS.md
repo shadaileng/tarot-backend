@@ -528,6 +528,7 @@ Admin 解除 A 的邮箱绑定：
 
 > ¹ 启用微信小程序登录 / 管理后台时必填，纯 API 调用模式可跳过。
 > 过期时间格式（`ms` 库）：`30m`（30分钟）、`2h`（2小时）、`7d`（7天）、`30d`（30天）。
+> 生成 JWT_SECRET：`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 
 ### 生产/开发关键差异
 

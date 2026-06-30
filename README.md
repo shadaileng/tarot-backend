@@ -273,6 +273,7 @@ curl "http://localhost:3000/health?noCache=1"
 > ¹ 启用微信小程序登录 / 管理后台时必填，纯 API 调用模式可跳过。
 > Docker 部署时 `PUPPETEER_EXECUTABLE_PATH` 和 `PUPPETEER_ARGS` 已在 Dockerfile 中硬编码。
 > 过期时间格式（`ms` 库）：`30m`（30分钟）、`2h`（2小时）、`7d`（7天）、`30d`（30天）。
+> 生成 JWT_SECRET：`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 
 ### 配置持久化
 
