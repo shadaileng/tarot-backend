@@ -324,12 +324,12 @@ export function initTaskDefinitions(): void {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
   const tasks: any[] = [
-    ['daily_read_1',  '每日占卜1次', '今日完成1次占卜', 'daily', 'read_count', 1, 5, 1, 1],
-    ['daily_read_3',  '每日占卜3次', '今日完成3次占卜', 'daily', 'read_count', 3, 10, 3, 2],
-    ['daily_share',   '分享1次', '今日分享1次占卜结果', 'daily', 'share_count', 1, 5, 1, 3],
+    ['daily_read_1',  '每日抽卡1次', '今日完成1次抽卡', 'daily', 'read_count', 1, 5, 1, 1],
+    ['daily_read_3',  '每日抽卡3次', '今日完成3次抽卡', 'daily', 'read_count', 3, 10, 3, 2],
+    ['daily_share',   '分享1次', '今日分享1次抽卡结果', 'daily', 'share_count', 1, 5, 1, 3],
     ['achv_checkin_3','连续签到3天', '连续签到达到3天', 'achievement', 'checkin_streak', 3, 20, 5, 4],
-    ['achv_read_10',  '累计10次占卜', '累计占卜达到10次', 'achievement', 'read_count', 10, 50, 10, 5],
-    ['achv_read_50',  '累计50次占卜', '累计占卜达到50次', 'achievement', 'read_count', 50, 200, 30, 6],
+    ['achv_read_10',  '累计10次抽卡', '累计抽卡达到10次', 'achievement', 'read_count', 10, 50, 10, 5],
+    ['achv_read_50',  '累计50次抽卡', '累计抽卡达到50次', 'achievement', 'read_count', 50, 200, 30, 6],
     ['achv_invite_1', '邀请1位好友', '成功邀请1位好友', 'achievement', 'invite_count', 1, 50, 10, 7],
     ['achv_invite_3', '邀请3位好友', '成功邀请3位好友', 'achievement', 'invite_count', 3, 200, 30, 8],
   ]
