@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.16.2] - 2026-07-01
+
+### Added
+
+- 新增 `POST /api/poster/key` 端点，返回 JSON 格式 cacheKey，解决小程序正式版 arraybuffer 响应头不可用问题
+
+### Fixed
+
+- CORS 中间件补上 `Access-Control-Expose-Headers`，暴露海报生成相关自定义 header
+
 ## [2.16.1] - 2026-06-30
 
 ### Added

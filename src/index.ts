@@ -650,6 +650,33 @@ app.post('/api/poster', async (req, res) => {
   }
 })
 
+app.post('/api/poster/key', async (req, res) => {
+  const posterData = req.body as PosterData
+
+  try {
+    if (!posterData.cards || !Array.isArray(posterData.cards) || posterData.cards.length === 0) {
+      res.status(400).json({ error: 'Invalid request: cards array is required' })
+      return
+    }
+
+    const cacheKey = posterCache.generateKey(posterData)
+
+    // 缓存未命中时先渲染海报并缓存
+    const cached = posterCache.get(cacheKey)
+    if (!cached) {
+      const html = buildPosterHTML(posterData)
+      const template = getTemplate(posterData.template)
+      const { buffer } = await renderPoster(html, template.width)
+      posterCache.set(cacheKey, buffer)
+    }
+
+    res.json({ cacheKey })
+  } catch (error) {
+    log.error({ err: error }, 'Poster key generation failed')
+    res.status(500).json({ error: 'Poster generation failed' })
+  }
+})
+
 app.get('/api/poster/:cacheKey', async (req, res) => {
   const { cacheKey } = req.params
   const cached = posterCache.get(cacheKey)
