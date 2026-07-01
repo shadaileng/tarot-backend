@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.16.3] - 2026-07-01
+
+### Fixed
+
+- 修复每日任务进度推进逻辑，`advanceTaskProgress` 现在会先重置过期任务再推进进度，解决用户登录后未查看任务列表直接做任务时进度被清零的问题
+
 ## [2.16.2] - 2026-07-01
 
 ### Added

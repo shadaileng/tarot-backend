@@ -132,13 +132,26 @@ export async function advanceTaskProgress(
   const db = await getDb()
   const today = getTodayDate()
 
+  // 先重置过期的每日任务
+  db.run(
+    `UPDATE user_tasks SET progress = 0, is_completed = 0, reward_claimed = 0, claimed_at = NULL
+     WHERE user_id = ? AND reset_date IS NOT NULL AND reset_date != ?`,
+    [userId, today],
+  )
+  db.run(
+    `UPDATE user_tasks SET reset_date = ?
+     WHERE user_id = ? AND reset_date IS NOT NULL AND reset_date != ?`,
+    [today, userId, today],
+  )
+
   const stmt = db.prepare(`
     SELECT ut.id, ut.task_id, ut.progress, ut.is_completed, td.requirement_count
     FROM user_tasks ut
     JOIN task_definitions td ON ut.task_id = td.id
     WHERE ut.user_id = ? AND td.requirement_type = ? AND td.is_active = 1 AND ut.reward_claimed = 0
+    AND (ut.reset_date IS NULL OR ut.reset_date = ?)
   `)
-  stmt.bind([userId, requirementType])
+  stmt.bind([userId, requirementType, today])
 
   const toUpdate: Array<{ taskId: string; newProgress: number; requirementCount: number }> = []
   while (stmt.step()) {
