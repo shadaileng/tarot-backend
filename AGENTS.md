@@ -160,6 +160,7 @@ POST /poster  { cards[], question, spreadName, ... }
 | GET | `/metrics` | Prometheus 指标 | ❌ | ❌ |
 | POST | `/reading` | AI 塔罗解读 | ❌ | ✅ |
 | POST | `/poster` | 海报生成 PNG | ❌ | ✅ |
+| POST | `/poster/key` | 海报缓存 key（JSON） | ❌ | ✅ |
 | GET | `/poster/:cacheKey` | 缓存海报 | ❌ | ❌ |
 | GET | `/logs` | 查询日志 | ❌ | ❌ |
 | GET | `/logs/:id` | 日志详情 | ❌ | ❌ |
@@ -230,6 +231,14 @@ interface ReadingRequestBody {
 成功响应：`image/png` 二进制，附加 `X-Cache`、`X-Render-*` 响应头。
 
 错误响应：400 / 401 / 500，JSON `{ error }`。
+
+### POST /poster/key
+
+请求体与 `/poster` 相同（`PosterData` 接口）。用于小程序端获取缓存 key（JSON 响应），避免 `responseType: 'arraybuffer'` 模式下正式版不返回自定义响应头的问题。
+
+成功响应：JSON `{ cacheKey: string }`。
+
+错误响应：400 / 500，JSON `{ error }`。
 
 ### GET /logs
 
