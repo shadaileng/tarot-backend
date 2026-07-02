@@ -79,7 +79,7 @@ export async function queryReadingLogs(page: number = 1, limit: number = 50): Pr
     : 0
 
   const offset = (page - 1) * limit
-  const finalSql = querySql + ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+  const finalSql = querySql + ' ORDER BY l.created_at DESC LIMIT ? OFFSET ?'
 
   const stmt = db.prepare(finalSql)
   stmt.bind([limit, offset])
@@ -228,7 +228,7 @@ export async function queryLogs(page: number = 1, limit: number = 50, target?: s
     : 0
 
   const offset = (page - 1) * limit
-  querySql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+  querySql += ' ORDER BY l.created_at DESC LIMIT ? OFFSET ?'
   const queryParams = [...params, limit, offset]
 
   const stmt = db.prepare(querySql)
