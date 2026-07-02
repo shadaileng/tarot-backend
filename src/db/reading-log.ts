@@ -26,6 +26,9 @@ export interface ReadingLogQueryResult {
 
 export interface InsertReadingLogParams {
   id: string
+  method: string
+  path: string
+  target: string
   user_id?: string | null
   question?: string | null
   cards_json?: string | null
@@ -38,11 +41,14 @@ export async function insertReadingLog(params: InsertReadingLogParams): Promise<
   const db = await getDb()
   const created_at = new Date().toISOString()
   db.run(
-    `INSERT INTO reading_logs (id, created_at, user_id, question, cards_json, reading, model, incomplete)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO reading_logs (id, created_at, method, path, target, user_id, question, cards_json, reading, model, incomplete)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       params.id,
       created_at,
+      params.method,
+      params.path,
+      params.target,
       params.user_id ?? null,
       params.question ?? null,
       params.cards_json ?? null,

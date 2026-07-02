@@ -104,6 +104,9 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
     if (target === 'reading') {
       insertReadingLog({
         id: logId,
+        method: req.method,
+        path: req.path,
+        target,
         user_id: userId,
         question: requestBody.question || null,
         cards_json: requestBody.cards ? JSON.stringify(requestBody.cards) : null,
