@@ -40,6 +40,8 @@ export async function getDb(): Promise<Database> {
     initSchema(db)
     initLevelDefinitions()
     initTaskDefinitions()
+    initDefaultPageSections()
+    initDefaultMenus()
     saveDb()
     log.info({ path: config.db.path, new: !existed }, 'Database initialized')
   }
@@ -286,6 +288,48 @@ function initSchema(database: Database): void {
   database.run('CREATE INDEX IF NOT EXISTS idx_feedback_user_id ON feedback(user_id)')
   database.run('CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status)')
   database.run('CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback(created_at DESC)')
+
+  // ========== 页面区域可见性 ==========
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS page_section_visibility (
+      id          TEXT PRIMARY KEY,
+      page_key    TEXT NOT NULL,
+      section_key TEXT NOT NULL,
+      label       TEXT NOT NULL,
+      visible     INTEGER NOT NULL DEFAULT 1,
+      updated_at  TEXT NOT NULL,
+      UNIQUE(page_key, section_key)
+    )
+  `)
+
+  // ========== 动态菜单 ==========
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS menus (
+      id          TEXT PRIMARY KEY,
+      parent_id   TEXT,
+      route_name  TEXT,
+      label       TEXT NOT NULL,
+      icon        TEXT,
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      is_visible  INTEGER NOT NULL DEFAULT 1,
+      require_role TEXT,
+      created_at  TEXT NOT NULL,
+      updated_at  TEXT NOT NULL,
+      FOREIGN KEY (parent_id) REFERENCES menus(id) ON DELETE CASCADE
+    )
+  `)
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS role_menus (
+      id      TEXT PRIMARY KEY,
+      role    TEXT NOT NULL,
+      menu_id TEXT NOT NULL,
+      FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE,
+      UNIQUE(role, menu_id)
+    )
+  `)
 }
 
 /** 初始化 level_definitions 默认数据 */
@@ -339,6 +383,111 @@ export function initTaskDefinitions(): void {
     stmt.reset()
   }
   stmt.free()
+}
+
+/** 初始化 page_section_visibility 默认数据 */
+export function initDefaultPageSections(): void {
+  if (!db) return
+  const stmt = db.prepare(`
+    INSERT OR IGNORE INTO page_section_visibility (id, page_key, section_key, label, visible, updated_at)
+    VALUES (?, ?, ?, ?, 1, ?)
+  `)
+  const now = new Date().toISOString()
+  const sections: [string, string, string, string][] = [
+    ['ps-index-particle', 'index', 'particle_background', '星空粒子背景'],
+    ['ps-index-hero',     'index', 'hero_section',        '顶部标题区域'],
+    ['ps-index-status',   'index', 'backend_status',      '后台服务状态'],
+    ['ps-index-spread',   'index', 'spread_selection',    '牌型选择'],
+    ['ps-index-question', 'index', 'question_input',      '问题输入'],
+    ['ps-index-draw',     'index', 'draw_button',         '抽牌按钮'],
+    ['ps-draw-spread',    'draw',  'spread_selection',    '牌型选择'],
+    ['ps-draw-question',  'draw',  'question_input',      '问题输入'],
+    ['ps-draw-preview',   'draw',  'spread_preview',      '牌型预览'],
+    ['ps-draw-draw',      'draw',  'draw_action',         '抽牌按钮'],
+  ]
+  for (const s of sections) {
+    stmt.bind([s[0], s[1], s[2], s[3], now])
+    stmt.step()
+    stmt.reset()
+  }
+  stmt.free()
+}
+
+/** 初始化 menus 默认数据 */
+export function initDefaultMenus(): void {
+  if (!db) return
+  const existing = db.exec('SELECT COUNT(*) as count FROM menus')
+  if (Number(existing[0]?.values[0]?.[0] ?? 0) > 0) return
+
+  const now = new Date().toISOString()
+
+  // 顶级菜单（分组）
+  const groups: [string, string, string | null, number][] = [
+    ['menu-system',    '系统监控', null, 1],
+    ['menu-user',      '用户管理', null, 2],
+    ['menu-operation', '运营管理', null, 3],
+  ]
+  const grpStmt = db.prepare(`
+    INSERT INTO menus (id, parent_id, route_name, label, icon, sort_order, is_visible, require_role, created_at, updated_at)
+    VALUES (?, NULL, NULL, ?, ?, ?, 1, NULL, ?, ?)
+  `)
+  const grpIcons: Record<string, string> = {
+    'menu-system':    'M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2',
+    'menu-user':      'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
+    'menu-operation': 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+  }
+  for (const g of groups) {
+    grpStmt.bind([g[0], g[1], grpIcons[g[0]] || null, g[2] || 0, now, now])
+    grpStmt.step()
+    grpStmt.reset()
+  }
+  grpStmt.free()
+
+  // 子菜单
+  const items: [string, string, string, string, string, number, string | null][] = [
+    // 系统监控
+    ['menu-dashboard',   'menu-system',    'dashboard',       '仪表盘',   'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', 1, null],
+    ['menu-logs',        'menu-system',    'logs',            '请求日志',  'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', 2, null],
+    ['menu-reading-logs','menu-system',    'reading-logs',    '解读日志',  'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253', 3, null],
+    ['menu-health',      'menu-system',    'health',          '健康监控',  'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z', 4, null],
+    ['menu-metrics',     'menu-system',    'metrics',         '指标',     'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', 5, null],
+    ['menu-config',      'menu-system',    'config',          '配置',     'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', 6, null],
+    ['menu-audit-logs',  'menu-system',    'audit-logs',      '操作日志',  'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', 7, null],
+    // 用户管理
+    ['menu-users',       'menu-user',      'users',           '用户管理',  'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', 1, null],
+    ['menu-user-stats',  'menu-user',      'user-stats',      '用户统计',  'M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', 2, null],
+    ['menu-checkin-stats','menu-user',     'checkin-stats',   '签到统计',  'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 3, null],
+    ['menu-invite-records','menu-user',    'invite-records',  '邀请记录',  'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1', 4, null],
+    // 运营管理
+    ['menu-admins',           'menu-operation', 'admins',           '管理员管理', 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', 1, 'admin'],
+    ['menu-levels',           'menu-operation', 'levels',           '等级管理', 'M13 10V3L4 14h7v7l9-11h-7z', 2, null],
+    ['menu-task-definitions', 'menu-operation', 'task-definitions', '任务管理', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4', 3, null],
+    ['menu-stats-trends',     'menu-operation', 'stats-trends',     '趋势统计', 'M18 20V10M12 20V4M6 20v-6', 4, null],
+    ['menu-feedback',         'menu-operation', 'feedback',         '意见反馈', 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z', 5, null],
+    ['menu-page-sections',    'menu-operation', 'page-sections',    '页面管理', 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', 6, null],
+  ]
+  const itemStmt = db.prepare(`
+    INSERT INTO menus (id, parent_id, route_name, label, icon, sort_order, is_visible, require_role, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+  `)
+  for (const item of items) {
+    itemStmt.bind([item[0], item[1], item[2], item[3], item[4], item[5], item[6], now, now])
+    itemStmt.step()
+    itemStmt.reset()
+  }
+  itemStmt.free()
+
+  // 默认角色菜单关联（admin 看所有菜单）
+  const allMenuIds = groups.map(g => g[0]).concat(items.map(i => i[0]))
+  const roleStmt = db.prepare(`
+    INSERT OR IGNORE INTO role_menus (id, role, menu_id) VALUES (?, 'admin', ?)
+  `)
+  for (const menuId of allMenuIds) {
+    roleStmt.bind([`rm-admin-${menuId}`, menuId])
+    roleStmt.step()
+    roleStmt.reset()
+  }
+  roleStmt.free()
 }
 
 export function closeDb(): void {

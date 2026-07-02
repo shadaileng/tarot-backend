@@ -22,6 +22,8 @@ import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } f
 import { queryLogs, getLogById } from './db/reading-log.js'
 import { queryUsers, unbindEmail, softDeleteUser, restoreUser } from './db/user.js'
 import { getAllConfig, upsertConfig, initDefaultConfig, loadUserConfig } from './db/config.js'
+import { getAllPageSections, updatePageSectionVisibility } from './db/page-sections.js'
+import { getMyMenus } from './db/menus.js'
 import { getDb, saveDb } from './db/index.js'
 import { wechatLoginHandler } from './auth/wechat-login.js'
 import { emailRegisterHandler } from './auth/email-register.js'
@@ -207,6 +209,23 @@ app.get('/api/user/stats', jwtAuthMiddleware, getUserStatsHandler)
 
 // 等级配置（公开）
 app.get('/api/levels', getLevelsHandler)
+
+// ========== 页面区域可见性（公开）==========
+
+app.get('/api/page-sections', async (_req, res) => {
+  try {
+    const sections = await getAllPageSections()
+    const result: Record<string, Record<string, boolean>> = {}
+    for (const s of sections) {
+      if (!result[s.page_key]) result[s.page_key] = {}
+      result[s.page_key][s.section_key] = s.visible === 1
+    }
+    res.json(result)
+  } catch (err) {
+    log.error({ err }, 'Failed to get page sections')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取页面配置失败' })
+  }
+})
 
 // ========== Admin 认证路由 ==========
 
@@ -1160,6 +1179,60 @@ app.put('/api/admin/users/:id/clear-invite', adminAuthMiddleware, async (req, re
   } catch (err) {
     log.error({ err }, 'Failed to clear invite')
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '操作失败' })
+  }
+})
+
+// ========== 动态菜单 API（Admin JWT）==========
+
+app.get('/api/admin/menus/my', adminAuthMiddleware, async (req, res) => {
+  try {
+    const role = (req as any).adminRole as string
+    const menus = await getMyMenus(role)
+    res.json({ menus })
+  } catch (err) {
+    log.error({ err }, 'Failed to get my menus')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取菜单失败' })
+  }
+})
+
+// ========== 页面管理 API（Admin JWT）==========
+
+app.get('/api/admin/page-sections', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const sections = await getAllPageSections()
+    res.json({
+      sections: sections.map(s => ({
+        id: s.id,
+        pageKey: s.page_key,
+        sectionKey: s.section_key,
+        label: s.label,
+        visible: s.visible === 1,
+        updatedAt: s.updated_at,
+      }))
+    })
+  } catch (err) {
+    log.error({ err }, 'Failed to get admin page sections')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取页面配置失败' })
+  }
+})
+
+app.put('/api/admin/page-sections/:id', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改配置' })
+    return
+  }
+  try {
+    const { visible } = req.body as { visible: number }
+    if (visible !== 0 && visible !== 1) {
+      res.status(400).json({ error: 'INVALID_INPUT', message: 'visible 必须为 0 或 1' })
+      return
+    }
+    await updatePageSectionVisibility(req.params.id, visible)
+    saveDb()
+    res.json({ message: '已更新' })
+  } catch (err) {
+    log.error({ err }, 'Failed to update page section')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '更新失败' })
   }
 })
 
