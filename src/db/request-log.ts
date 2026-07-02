@@ -85,7 +85,7 @@ function maskEmail(email: string | null): string | null {
 export async function queryRequestLogs(page: number = 1, limit: number = 50, target?: string, status?: string): Promise<RequestLogQueryResult> {
   const db = await getDb()
 
-  let countSql = 'SELECT COUNT(*) as cnt FROM request_logs'
+  let countSql = 'SELECT COUNT(*) as cnt FROM request_logs l'
   let querySql = `SELECT l.*,
     u.nickname   AS user_nickname,
     u.email      AS user_email,
