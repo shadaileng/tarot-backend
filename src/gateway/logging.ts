@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import crypto from 'crypto'
-import { insertLog } from '../db/reading-log.js'
+import { insertRequestLog } from '../db/request-log.js'
+import { insertReadingLog } from '../db/reading-log.js'
 import { getLogger } from '../logger.js'
 
 const log = getLogger('gateway')
@@ -25,7 +26,7 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
   let logWritten = false
 
   function writeLog(body: any): void {
-    if (logWritten || target === 'other') return
+    if (logWritten) return
     logWritten = true
     const duration = Date.now() - start
     const userId = (req as any).userId || null
@@ -62,27 +63,50 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
       }, `${req.method} ${req.path} ${res.statusCode} ${duration}ms`)
     }
 
-    insertLog({
+    // 从响应头提取分阶段耗时（poster 请求）
+    const templateMs = parseInt(res.getHeader('X-Render-Template-Ms') as string) || null
+    const resourceMs = parseInt(res.getHeader('X-Render-Resource-Ms') as string) || null
+    const screenshotMs = parseInt(res.getHeader('X-Render-Screenshot-Ms') as string) || null
+    const cacheHit = res.getHeader('X-Cache') === 'HIT'
+
+    // 写入 request_logs（所有请求）
+    insertRequestLog({
       id: logId,
       method: req.method,
       path: req.path,
       target,
       status_code: res.statusCode,
       duration_ms: duration,
+      template_ms: templateMs,
+      resource_ms: resourceMs,
+      screenshot_ms: screenshotMs,
+      cache_hit: cacheHit,
       ip_address: ip,
-      question: requestBody.question || null,
-      cards_json: requestBody.cards ? JSON.stringify(requestBody.cards) : null,
-      reading: target === 'reading' && respObj ? (respObj.reading || null) : null,
-      model: target === 'reading' && respObj ? (respObj.model || null) : null,
-      incomplete: target === 'reading' && respObj ? !!(respObj.incomplete) : false,
       is_error: isError,
       error_msg: errorMsg,
       user_id: userId,
     }).then(() => {
-      log.info({ logId, target, userId }, 'insertLog OK')
+      log.info({ logId, target, userId }, 'insertRequestLog OK')
     }).catch((err) => {
-      log.error({ err, logId, target, userId, statusCode: res.statusCode }, 'insertLog FAILED')
+      log.error({ err, logId, target, userId, statusCode: res.statusCode }, 'insertRequestLog FAILED')
     })
+
+    // 写入 reading_logs（仅 reading 请求）
+    if (target === 'reading') {
+      insertReadingLog({
+        id: logId,
+        user_id: userId,
+        question: requestBody.question || null,
+        cards_json: requestBody.cards ? JSON.stringify(requestBody.cards) : null,
+        reading: respObj ? (respObj.reading || null) : null,
+        model: respObj ? (respObj.model || null) : null,
+        incomplete: respObj ? !!(respObj.incomplete) : false,
+      }).then(() => {
+        log.info({ logId, target, userId }, 'insertReadingLog OK')
+      }).catch((err) => {
+        log.error({ err, logId, target, userId }, 'insertReadingLog FAILED')
+      })
+    }
   }
 
   const originalJson = res.json.bind(res)

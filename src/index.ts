@@ -19,7 +19,8 @@ import { metrics } from './monitor/index.js'
 import { getLogger } from './logger.js'
 import { readingHandler } from './reading/handler.js'
 import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } from './reading/models.js'
-import { queryLogs, getLogById } from './db/reading-log.js'
+import { queryRequestLogs, getRequestLogById } from './db/request-log.js'
+import { queryReadingLogs, getReadingLogById } from './db/reading-log.js'
 import { queryUsers, unbindEmail, softDeleteUser, restoreUser } from './db/user.js'
 import { getAllConfig, upsertConfig, initDefaultConfig, loadUserConfig } from './db/config.js'
 import { getAllPageSections, updatePageSectionVisibility } from './db/page-sections.js'
@@ -713,14 +714,31 @@ app.get('/api/logs', adminAuthMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
   const target = req.query.target as string | undefined
-  const result = await queryLogs(page, limit, target)
+  const result = await queryRequestLogs(page, limit, target)
   res.json(result)
 })
 
 app.get('/api/logs/:id', adminAuthMiddleware, async (req, res) => {
-  const log = await getLogById(req.params.id)
+  const log = await getRequestLogById(req.params.id)
   if (!log) {
     res.status(404).json({ error: 'Log not found' })
+    return
+  }
+  res.json(log)
+})
+
+// 解读日志（仅 reading 请求）
+app.get('/api/reading-logs', adminAuthMiddleware, async (req, res) => {
+  const page = parseInt(req.query.page as string) || 1
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
+  const result = await queryReadingLogs(page, limit)
+  res.json(result)
+})
+
+app.get('/api/reading-logs/:id', adminAuthMiddleware, async (req, res) => {
+  const log = await getReadingLogById(req.params.id)
+  if (!log) {
+    res.status(404).json({ error: 'Reading log not found' })
     return
   }
   res.json(log)

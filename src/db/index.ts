@@ -73,6 +73,31 @@ function initSchema(database: Database): void {
   database.run('CREATE INDEX IF NOT EXISTS idx_logs_created_at ON reading_logs(created_at DESC)')
   database.run('CREATE INDEX IF NOT EXISTS idx_logs_target ON reading_logs(target)')
 
+  // ========== 请求日志表（所有请求） ==========
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS request_logs (
+      id             TEXT PRIMARY KEY,
+      created_at     TEXT NOT NULL,
+      method         TEXT NOT NULL,
+      path           TEXT NOT NULL,
+      target         TEXT NOT NULL,
+      status_code    INTEGER,
+      duration_ms    INTEGER,
+      template_ms    INTEGER,
+      resource_ms    INTEGER,
+      screenshot_ms  INTEGER,
+      cache_hit      INTEGER DEFAULT 0,
+      ip_address     TEXT,
+      is_error       INTEGER DEFAULT 0,
+      error_msg      TEXT,
+      user_id        TEXT
+    )
+  `)
+  database.run('CREATE INDEX IF NOT EXISTS idx_request_logs_created_at ON request_logs(created_at DESC)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_request_logs_target ON request_logs(target)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_request_logs_path ON request_logs(path)')
+
   database.run(`
     CREATE TABLE IF NOT EXISTS system_config (
       key         TEXT PRIMARY KEY,

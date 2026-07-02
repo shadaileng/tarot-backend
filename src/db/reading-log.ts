@@ -1,5 +1,120 @@
 import { getDb, closeDb, saveDb } from './index.js'
 
+// ========== 精简版：解读日志 ==========
+
+export interface ReadingLogEntry {
+  id: string
+  created_at: string
+  user_id: string | null
+  question: string | null
+  cards_json: string | null
+  reading: string | null
+  model: string | null
+  incomplete: number | null
+  // JOIN 字段
+  user_nickname: string | null
+  user_email: string | null
+  user_avatar: string | null
+}
+
+export interface ReadingLogQueryResult {
+  total: number
+  page: number
+  limit: number
+  data: ReadingLogEntry[]
+}
+
+export interface InsertReadingLogParams {
+  id: string
+  user_id?: string | null
+  question?: string | null
+  cards_json?: string | null
+  reading?: string | null
+  model?: string | null
+  incomplete?: boolean
+}
+
+export async function insertReadingLog(params: InsertReadingLogParams): Promise<void> {
+  const db = await getDb()
+  const created_at = new Date().toISOString()
+  db.run(
+    `INSERT INTO reading_logs (id, created_at, user_id, question, cards_json, reading, model, incomplete)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      params.id,
+      created_at,
+      params.user_id ?? null,
+      params.question ?? null,
+      params.cards_json ?? null,
+      params.reading ?? null,
+      params.model ?? null,
+      params.incomplete ? 1 : 0,
+    ],
+  )
+  saveDb()
+}
+
+function maskEmail(email: string | null): string | null {
+  if (!email) return null
+  const [local, domain] = email.split('@')
+  if (!domain) return email
+  const visible = local.length > 1 ? local[0] + '***' : '***'
+  return visible + '@' + domain
+}
+
+export async function queryReadingLogs(page: number = 1, limit: number = 50): Promise<ReadingLogQueryResult> {
+  const db = await getDb()
+
+  const countSql = 'SELECT COUNT(*) as cnt FROM reading_logs'
+  const querySql = `SELECT l.id, l.created_at, l.user_id, l.question, l.cards_json, l.reading, l.model, l.incomplete,
+    u.nickname   AS user_nickname,
+    u.email      AS user_email,
+    u.avatar_url AS user_avatar
+  FROM reading_logs l
+  LEFT JOIN users u ON l.user_id = u.id`
+
+  const countResult = db.exec(countSql)
+  const total = countResult.length > 0 && countResult[0].values.length > 0
+    ? Number(countResult[0].values[0][0])
+    : 0
+
+  const offset = (page - 1) * limit
+  const finalSql = querySql + ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+
+  const stmt = db.prepare(finalSql)
+  stmt.bind([limit, offset])
+  const rows: ReadingLogEntry[] = []
+  while (stmt.step()) {
+    const row = stmt.getAsObject() as unknown as ReadingLogEntry
+    row.user_email = maskEmail(row.user_email)
+    rows.push(row)
+  }
+  stmt.free()
+
+  return { total, page, limit, data: rows }
+}
+
+export async function getReadingLogById(id: string): Promise<ReadingLogEntry | undefined> {
+  const db = await getDb()
+  const stmt = db.prepare(`SELECT l.id, l.created_at, l.user_id, l.question, l.cards_json, l.reading, l.model, l.incomplete,
+    u.nickname   AS user_nickname,
+    u.email      AS user_email,
+    u.avatar_url AS user_avatar
+  FROM reading_logs l
+  LEFT JOIN users u ON l.user_id = u.id
+  WHERE l.id = ?`)
+  stmt.bind([id])
+  let row: ReadingLogEntry | undefined
+  if (stmt.step()) {
+    row = stmt.getAsObject() as unknown as ReadingLogEntry
+    row.user_email = maskEmail(row.user_email)
+  }
+  stmt.free()
+  return row
+}
+
+// ========== 旧版：完整日志（向后兼容） ==========
+
 export interface LogEntry {
   id: string
   created_at: string
@@ -75,14 +190,6 @@ export async function insertLog(params: InsertLogParams): Promise<void> {
     ],
   )
   saveDb()
-}
-
-function maskEmail(email: string | null): string | null {
-  if (!email) return null
-  const [local, domain] = email.split('@')
-  if (!domain) return email
-  const visible = local.length > 1 ? local[0] + '***' : '***'
-  return visible + '@' + domain
 }
 
 export async function queryLogs(page: number = 1, limit: number = 50, target?: string): Promise<LogQueryResult> {

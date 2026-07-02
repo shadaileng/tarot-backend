@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.18.0] - 2026-07-02
+
+### Added
+
+- 新建 `request_logs` 表，记录所有请求的访问日志（含分阶段耗时、缓存命中等）
+- 新建 `src/db/request-log.ts`，提供请求日志 CRUD 和统计函数
+- 新增 `GET /api/reading-logs` 和 `GET /api/reading-logs/:id` 端点，查询解读日志
+
+### Changed
+
+- `GET /api/logs` 改为查询 `request_logs` 表（原 `reading_logs`）
+- `gateway/logging.ts` 重构：所有请求写入 `request_logs`，仅 `reading` 请求同时写入 `reading_logs`
+
 ## [2.16.3] - 2026-07-01
 
 ### Fixed
