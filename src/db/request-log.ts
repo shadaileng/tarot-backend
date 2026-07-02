@@ -159,6 +159,13 @@ export async function getRequestLogById(id: string): Promise<RequestLogEntry | u
   return row
 }
 
+export interface TargetStats {
+  target: string
+  count: number
+  errors: number
+  avgDurationMs: number
+}
+
 export interface RequestStats {
   totalRequests: number
   errors: number
@@ -169,10 +176,22 @@ export interface RequestStats {
   avgTemplateMs: number
   avgResourceMs: number
   avgScreenshotMs: number
+  p50Ms: number
+  p95Ms: number
+  p99Ms: number
+  byTarget: TargetStats[]
+}
+
+function percentile(sortedValues: number[], p: number): number {
+  if (sortedValues.length === 0) return 0
+  const index = Math.ceil((p / 100) * sortedValues.length) - 1
+  return sortedValues[Math.max(0, index)]
 }
 
 export async function getRequestStats(): Promise<RequestStats> {
   const db = await getDb()
+
+  // 基础统计
   const result = db.exec(`
     SELECT
       COUNT(*) as totalRequests,
@@ -186,6 +205,43 @@ export async function getRequestStats(): Promise<RequestStats> {
     FROM request_logs
   `)
 
+  // 分位数统计（需要获取所有 duration_ms 值排序）
+  const durationResult = db.exec(`
+    SELECT duration_ms FROM request_logs WHERE duration_ms IS NOT NULL ORDER BY duration_ms
+  `)
+
+  let p50Ms = 0, p95Ms = 0, p99Ms = 0
+  if (durationResult.length > 0 && durationResult[0].values.length > 0) {
+    const durations = durationResult[0].values.map((r) => Number(r[0]))
+    p50Ms = percentile(durations, 50)
+    p95Ms = percentile(durations, 95)
+    p99Ms = percentile(durations, 99)
+  }
+
+  // 按 target 分组统计
+  const targetResult = db.exec(`
+    SELECT
+      target,
+      COUNT(*) as count,
+      SUM(CASE WHEN is_error = 1 THEN 1 ELSE 0 END) as errors,
+      AVG(duration_ms) as avgDurationMs
+    FROM request_logs
+    GROUP BY target
+    ORDER BY count DESC
+  `)
+
+  const byTarget: TargetStats[] = []
+  if (targetResult.length > 0) {
+    for (const row of targetResult[0].values) {
+      byTarget.push({
+        target: String(row[0]),
+        count: Number(row[1]) || 0,
+        errors: Number(row[2]) || 0,
+        avgDurationMs: Number(row[3]) || 0,
+      })
+    }
+  }
+
   if (result.length === 0 || result[0].values.length === 0) {
     return {
       totalRequests: 0,
@@ -197,6 +253,10 @@ export async function getRequestStats(): Promise<RequestStats> {
       avgTemplateMs: 0,
       avgResourceMs: 0,
       avgScreenshotMs: 0,
+      p50Ms: 0,
+      p95Ms: 0,
+      p99Ms: 0,
+      byTarget: [],
     }
   }
 
@@ -220,5 +280,9 @@ export async function getRequestStats(): Promise<RequestStats> {
     avgTemplateMs,
     avgResourceMs,
     avgScreenshotMs,
+    p50Ms,
+    p95Ms,
+    p99Ms,
+    byTarget,
   }
 }

@@ -19,7 +19,7 @@ import { metrics } from './monitor/index.js'
 import { getLogger } from './logger.js'
 import { readingHandler } from './reading/handler.js'
 import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } from './reading/models.js'
-import { queryRequestLogs, getRequestLogById } from './db/request-log.js'
+import { queryRequestLogs, getRequestLogById, getRequestStats } from './db/request-log.js'
 import { queryReadingLogs, getReadingLogById } from './db/reading-log.js'
 import { queryUsers, unbindEmail, softDeleteUser, restoreUser } from './db/user.js'
 import { getAllConfig, upsertConfig, initDefaultConfig, loadUserConfig } from './db/config.js'
@@ -114,7 +114,7 @@ app.get('/', (_req, res) => {
 
 app.get('/api/health', async (req, res) => {
   const poolStats = await getPoolStats()
-  const snap = metrics.getSnapshot()
+  const stats = await getRequestStats()
   const noCache = req.query.noCache === '1'
 
   // 默认状态：Worker 正常运行
@@ -153,13 +153,13 @@ app.get('/api/health', async (req, res) => {
     cache: {
       size: posterCache.size,
       maxSize: posterCache.maxSize,
-      hitRate: snap.cacheHitRate,
+      hitRate: stats.cacheHitRate,
     },
     pool: poolStats ?? { available: 0, active: 0, waiting: 0, maxPages: config.pool.maxPages },
     metrics: {
-      totalRequests: snap.totalRequests,
-      errors: snap.errorCount,
-      avgTotalMs: Math.round(snap.avgTotalMs),
+      totalRequests: stats.totalRequests,
+      errors: stats.errors,
+      avgTotalMs: Math.round(stats.avgTotalMs),
     },
   }
 
@@ -172,9 +172,70 @@ app.get('/api/health', async (req, res) => {
   res.status(httpStatus).json(responseBody)
 })
 
-app.get('/api/metrics', (_req, res) => {
+app.get('/api/metrics', async (_req, res) => {
+  const stats = await getRequestStats()
+
+  const lines: string[] = [
+    '# HELP request_requests_total Total number of API requests',
+    '# TYPE request_requests_total counter',
+    `request_requests_total ${stats.totalRequests}`,
+    '',
+    '# HELP request_errors_total Total number of error requests',
+    '# TYPE request_errors_total counter',
+    `request_errors_total ${stats.errors}`,
+    '',
+    '# HELP request_cache_hits_total Total number of cache hits',
+    '# TYPE request_cache_hits_total counter',
+    `request_cache_hits_total ${stats.cacheHits}`,
+    '',
+    '# HELP request_cache_misses_total Total number of cache misses',
+    '# TYPE request_cache_misses_total counter',
+    `request_cache_misses_total ${stats.cacheMisses}`,
+    '',
+    '# HELP request_cache_hit_rate Cache hit rate (0-1)',
+    '# TYPE request_cache_hit_rate gauge',
+    `request_cache_hit_rate ${stats.cacheHitRate.toFixed(4)}`,
+    '',
+    '# HELP request_duration_ms Request duration in milliseconds',
+    '# TYPE request_duration_ms summary',
+    `request_duration_ms{quantile="0.5"} ${stats.p50Ms}`,
+    `request_duration_ms{quantile="0.95"} ${stats.p95Ms}`,
+    `request_duration_ms{quantile="0.99"} ${stats.p99Ms}`,
+    `request_duration_ms_sum ${(stats.avgTotalMs * stats.totalRequests).toFixed(0)}`,
+    `request_duration_ms_count ${stats.totalRequests}`,
+    '',
+    '# HELP request_template_duration_ms Template generation duration (poster only)',
+    '# TYPE request_template_duration_ms gauge',
+    `request_template_duration_ms ${stats.avgTemplateMs.toFixed(2)}`,
+    '',
+    '# HELP request_resource_duration_ms Resource loading duration (poster only)',
+    '# TYPE request_resource_duration_ms gauge',
+    `request_resource_duration_ms ${stats.avgResourceMs.toFixed(2)}`,
+    '',
+    '# HELP request_screenshot_duration_ms Screenshot duration (poster only)',
+    '# TYPE request_screenshot_duration_ms gauge',
+    `request_screenshot_duration_ms ${stats.avgScreenshotMs.toFixed(2)}`,
+    '',
+  ]
+
+  // 按 target 分组统计
+  for (const t of stats.byTarget) {
+    lines.push(`# HELP request_by_target_total Requests by target (${t.target})`)
+    lines.push(`# TYPE request_by_target_total counter`)
+    lines.push(`request_by_target_total{target="${t.target}"} ${t.count}`)
+    lines.push('')
+    lines.push(`# HELP request_by_target_errors Errors by target (${t.target})`)
+    lines.push(`# TYPE request_by_target_errors counter`)
+    lines.push(`request_by_target_errors{target="${t.target}"} ${t.errors}`)
+    lines.push('')
+    lines.push(`# HELP request_by_target_avg_duration_ms Avg duration by target (${t.target})`)
+    lines.push(`# TYPE request_by_target_avg_duration_ms gauge`)
+    lines.push(`request_by_target_avg_duration_ms{target="${t.target}"} ${t.avgDurationMs.toFixed(2)}`)
+    lines.push('')
+  }
+
   res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
-  res.send(metrics.toPrometheus())
+  res.send(lines.join('\n'))
 })
 
 // ========== 认证相关路由 ==========
@@ -1549,18 +1610,21 @@ async function start(): Promise<void> {
     }, 'Service started')
 
     // 周期状态日志 — 每 60s 输出一条 metrics snapshot（健康自检）
-    const statusInterval = setInterval(() => {
-      const snap = metrics.getSnapshot()
-      log.info({
-        totalRequests: snap.totalRequests,
-        errorCount: snap.errorCount,
-        errorRate: snap.totalRequests > 0
-          ? (snap.errorCount / snap.totalRequests * 100).toFixed(2) + '%'
-          : '0%',
-        avgTotalMs: Math.round(snap.avgTotalMs),
-        cacheHitRate: (snap.cacheHitRate * 100).toFixed(1) + '%',
-        sampleCount: snap.sampleCount,
-      }, 'Periodic status report')
+    const statusInterval = setInterval(async () => {
+      try {
+        const stats = await getRequestStats()
+        log.info({
+          totalRequests: stats.totalRequests,
+          errorCount: stats.errors,
+          errorRate: stats.totalRequests > 0
+            ? (stats.errors / stats.totalRequests * 100).toFixed(2) + '%'
+            : '0%',
+          avgTotalMs: Math.round(stats.avgTotalMs),
+          cacheHitRate: (stats.cacheHitRate * 100).toFixed(1) + '%',
+        }, 'Periodic status report')
+      } catch (err) {
+        log.error({ err }, 'Periodic status report failed')
+      }
     }, 60000)
     statusInterval.unref()
   })
