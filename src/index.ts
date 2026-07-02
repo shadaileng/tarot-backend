@@ -775,7 +775,8 @@ app.get('/api/logs', adminAuthMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1
   const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
   const target = req.query.target as string | undefined
-  const result = await queryRequestLogs(page, limit, target)
+  const status = req.query.status as string | undefined
+  const result = await queryRequestLogs(page, limit, target, status)
   res.json(result)
 })
 

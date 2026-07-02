@@ -82,7 +82,7 @@ function maskEmail(email: string | null): string | null {
   return visible + '@' + domain
 }
 
-export async function queryRequestLogs(page: number = 1, limit: number = 50, target?: string): Promise<RequestLogQueryResult> {
+export async function queryRequestLogs(page: number = 1, limit: number = 50, target?: string, status?: string): Promise<RequestLogQueryResult> {
   const db = await getDb()
 
   let countSql = 'SELECT COUNT(*) as cnt FROM request_logs'
@@ -102,8 +102,16 @@ export async function queryRequestLogs(page: number = 1, limit: number = 50, tar
   const params: any[] = []
 
   if (target) {
-    where.push('target = ?')
+    where.push('l.target = ?')
     params.push(target)
+  }
+
+  if (status === '2xx') {
+    where.push('l.status_code >= 200 AND l.status_code < 300')
+  } else if (status === '4xx') {
+    where.push('l.status_code >= 400 AND l.status_code < 500')
+  } else if (status === '5xx') {
+    where.push('l.status_code >= 500 AND l.status_code < 600')
   }
 
   if (where.length > 0) {
