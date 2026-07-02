@@ -146,6 +146,34 @@ function initSchema(database: Database): void {
   database.run('CREATE INDEX IF NOT EXISTS idx_records_user_id ON reading_records(user_id)')
   database.run('CREATE INDEX IF NOT EXISTS idx_records_created_at ON reading_records(created_at DESC)')
 
+  // ========== 合并后的 readings 表（异步任务 + 历史记录） ==========
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS readings (
+      id              TEXT PRIMARY KEY,
+      user_id         TEXT,
+      created_at      TEXT NOT NULL,
+      updated_at      TEXT,
+      spread_type     TEXT NOT NULL DEFAULT '',
+      question        TEXT,
+      cards_json      TEXT NOT NULL,
+      reading         TEXT,
+      model           TEXT,
+      status          TEXT NOT NULL DEFAULT 'completed',
+      is_local        INTEGER DEFAULT 0,
+      incomplete      INTEGER DEFAULT 0,
+      warning         TEXT,
+      error_msg       TEXT,
+      interpretation  TEXT,
+      request_log_id  TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `)
+  database.run('CREATE INDEX IF NOT EXISTS idx_readings_user_id ON readings(user_id)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_readings_created_at ON readings(created_at DESC)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_readings_status ON readings(status)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_readings_request_log_id ON readings(request_log_id)')
+
   // ========== 管理员表 ==========
 
   database.run(`

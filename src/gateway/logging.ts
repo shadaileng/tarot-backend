@@ -1,7 +1,6 @@
 import type { Request, Response, NextFunction } from 'express'
 import crypto from 'crypto'
 import { insertRequestLog } from '../db/request-log.js'
-import { insertReadingLog } from '../db/reading-log.js'
 import { getLogger } from '../logger.js'
 
 const log = getLogger('gateway')
@@ -100,25 +99,6 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
       log.error({ err, logId, target, userId, statusCode: res.statusCode }, 'insertRequestLog FAILED')
     })
 
-    // 写入 reading_logs（仅 reading 请求）
-    if (target === 'reading') {
-      insertReadingLog({
-        id: logId,
-        method: req.method,
-        path: req.path,
-        target,
-        user_id: userId,
-        question: requestBody.question || null,
-        cards_json: requestBody.cards ? JSON.stringify(requestBody.cards) : null,
-        reading: respObj ? (respObj.reading || null) : null,
-        model: respObj ? (respObj.model || null) : null,
-        incomplete: respObj ? !!(respObj.incomplete) : false,
-      }).then(() => {
-        log.info({ logId, target, userId }, 'insertReadingLog OK')
-      }).catch((err) => {
-        log.error({ err, logId, target, userId }, 'insertReadingLog FAILED')
-      })
-    }
   }
 
   const originalJson = res.json.bind(res)

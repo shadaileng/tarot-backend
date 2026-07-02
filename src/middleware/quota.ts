@@ -73,18 +73,29 @@ export async function quotaMiddleware(req: Request, res: Response, next: NextFun
     }
   }
 
+  const isAsyncRoute = req.path === '/api/reading/start'
+
   const userId = req.userId
   if (userId) {
-    const finishHandler = () => {
-      if (res.statusCode === 200) {
-        consumeQuota(userId).catch((e: Error) => log.warn({ err: e }, 'Failed to consume quota'))
-        incrementReadings(userId).catch((e: Error) => log.warn({ err: e }, 'Failed to increment readings'))
-        addPoints(userId, 2).catch((e: Error) => log.warn({ err: e }, 'Failed to add points'))
-        advanceTaskProgress(userId, 'read_count').catch((e: Error) => log.warn({ err: e }, 'Failed to advance task'))
-        completeInvite(userId).catch((e: Error) => log.warn({ err: e }, 'Failed to process invite'))
+    if (isAsyncRoute) {
+      // 异步解读路由：立即消费额度，不等待 finish 回调
+      consumeQuota(userId).catch((e: Error) => log.warn({ err: e }, 'Failed to consume quota'))
+      incrementReadings(userId).catch((e: Error) => log.warn({ err: e }, 'Failed to increment readings'))
+      addPoints(userId, 2).catch((e: Error) => log.warn({ err: e }, 'Failed to add points'))
+      advanceTaskProgress(userId, 'read_count').catch((e: Error) => log.warn({ err: e }, 'Failed to advance task'))
+      completeInvite(userId).catch((e: Error) => log.warn({ err: e }, 'Failed to process invite'))
+    } else {
+      const finishHandler = () => {
+        if (res.statusCode === 200) {
+          consumeQuota(userId).catch((e: Error) => log.warn({ err: e }, 'Failed to consume quota'))
+          incrementReadings(userId).catch((e: Error) => log.warn({ err: e }, 'Failed to increment readings'))
+          addPoints(userId, 2).catch((e: Error) => log.warn({ err: e }, 'Failed to add points'))
+          advanceTaskProgress(userId, 'read_count').catch((e: Error) => log.warn({ err: e }, 'Failed to advance task'))
+          completeInvite(userId).catch((e: Error) => log.warn({ err: e }, 'Failed to process invite'))
+        }
       }
+      res.on('finish', finishHandler)
     }
-    res.on('finish', finishHandler)
   } else if (isGuest) {
     const ip = req.ip || req.socket.remoteAddress || 'unknown'
     const today = getTodayDate()

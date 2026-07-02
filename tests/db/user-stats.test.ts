@@ -290,4 +290,80 @@ describe('user-stats DB layer', () => {
       expect(stats!.points).toBe(0)
     })
   })
+
+  describe('refundQuota', () => {
+    it('should decrease daily_quota_used and total_readings by 1', async () => {
+      const { createUserStats, consumeQuota, refundQuota } = await import('../../src/db/user-stats.js')
+      insertTestUser(currentDb!, 'user-1')
+      await createUserStats('user-1')
+
+      // 先消费一次额度
+      await consumeQuota('user-1')
+
+      // 退款
+      await refundQuota('user-1')
+
+      const stmt = currentDb!.prepare('SELECT daily_quota_used, total_readings FROM user_stats WHERE user_id = ?')
+      stmt.bind(['user-1'])
+      stmt.step()
+      const row = stmt.getAsObject() as any
+      stmt.free()
+      expect(row.daily_quota_used).toBe(0)
+      expect(row.total_readings).toBe(0)
+    })
+
+    it('should not go below zero', async () => {
+      const { createUserStats, refundQuota } = await import('../../src/db/user-stats.js')
+      insertTestUser(currentDb!, 'user-1')
+      await createUserStats('user-1')
+
+      // 未消费直接退款
+      await refundQuota('user-1')
+
+      const stmt = currentDb!.prepare('SELECT daily_quota_used, total_readings FROM user_stats WHERE user_id = ?')
+      stmt.bind(['user-1'])
+      stmt.step()
+      const row = stmt.getAsObject() as any
+      stmt.free()
+      expect(row.daily_quota_used).toBe(0)
+      expect(row.total_readings).toBe(0)
+    })
+
+    it('should handle multiple refunds without going negative', async () => {
+      const { createUserStats, consumeQuota, refundQuota } = await import('../../src/db/user-stats.js')
+      insertTestUser(currentDb!, 'user-1')
+      await createUserStats('user-1')
+
+      await consumeQuota('user-1')
+      await refundQuota('user-1')
+      await refundQuota('user-1')  // 再次退款，不应 < 0
+
+      const stmt = currentDb!.prepare('SELECT daily_quota_used FROM user_stats WHERE user_id = ?')
+      stmt.bind(['user-1'])
+      stmt.step()
+      const row = stmt.getAsObject() as any
+      stmt.free()
+      expect(row.daily_quota_used).toBe(0)
+    })
+
+    it('should restore availability after full consumption and refund', async () => {
+      const { createUserStats, consumeQuota, refundQuota, getAvailableQuota } = await import('../../src/db/user-stats.js')
+      insertTestUser(currentDb!, 'user-1')
+      await createUserStats('user-1')
+
+      // 用完全部额度（level 1 = 3）
+      for (let i = 0; i < 3; i++) {
+        await consumeQuota('user-1')
+      }
+      let quota = await getAvailableQuota('user-1')
+      expect(quota.remaining).toBe(0)
+
+      // 退款一次
+      await refundQuota('user-1')
+
+      quota = await getAvailableQuota('user-1')
+      expect(quota.used).toBe(2)
+      expect(quota.remaining).toBe(1)
+    })
+  })
 })

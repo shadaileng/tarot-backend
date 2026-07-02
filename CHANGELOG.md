@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.21.0] - 2026-07-03
+
+### Added
+
+- 新增 `src/reading/async-handler.ts`：异步解读接口实现
+  - `startReadingHandler`：提交任务立即返回 taskId，后台异步生成解读
+  - `getReadingResultHandler`：轮询任务结果（pending/completed/failed）
+  - `processTask`：异步处理 Gemini 调用，成功标记完成，失败退还额度
+  - `recoverPendingTasks`：服务重启时扫描并恢复 pending 任务
+- 新增 `src/db/user-stats.ts` 中 `refundQuota` 函数（异常时退还已扣额度）
+- 新增 `POST /api/reading/start` 和 `GET /api/reading/result/:taskId` 异步路由
+- 新增 `tests/reading/async-handler.test.ts`：8 条处理器单元测试
+- 追加 `tests/db/user-stats.test.ts`：4 条 refundQuota 测试
+
+### Changed
+
+- `quotaMiddleware`：异步路由 `/api/reading/start` 立即消费额度，不等待 finish 回调
+
+## [2.20.0] - 2026-07-03
+
+### Added
+
+- 新增 `src/db/reading-task.ts`：`readings` 表专用 CRUD（createReadingTask / getReadingTask / completeReadingTask / failReadingTask / getAsyncTaskStats）
+- 新增 `readings` 表建表语句及索引，合并 `reading_logs` + `reading_records` 为单一业务表
+- 新增 `src/db/migrations/001-merge-readings.sql`：数据迁移脚本
+- 新增 `tests/db/reading-task.test.ts`：16 条 CRUD 单元测试
+
+### Changed
+
+- `gateway/logging.ts`：移除 `insertReadingLog` 分支，解读日志不再写入 `reading_logs` 表（业务字段由 `readings` 承载，监控字段由 `request_logs` 覆盖）
+- `tests/test-helpers.ts`：`initTestSchema` 新增 `request_logs` / `readings` 建表语句
+
 ## [2.19.2] - 2026-07-02
 
 ### Fixed

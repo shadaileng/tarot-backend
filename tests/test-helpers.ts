@@ -137,6 +137,44 @@ export function initTestSchema(database: Database): void {
       UNIQUE(user_id, task_id)
     )
   `)
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS request_logs (
+      id              TEXT PRIMARY KEY,
+      method          TEXT,
+      path            TEXT,
+      status_code     INTEGER,
+      duration_ms     INTEGER,
+      created_at      TEXT,
+      ip_address      TEXT
+    )
+  `)
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS readings (
+      id              TEXT PRIMARY KEY,
+      user_id         TEXT,
+      created_at      TEXT NOT NULL,
+      updated_at      TEXT,
+      spread_type     TEXT NOT NULL DEFAULT '',
+      question        TEXT,
+      cards_json      TEXT NOT NULL,
+      reading         TEXT,
+      model           TEXT,
+      status          TEXT NOT NULL DEFAULT 'completed',
+      is_local        INTEGER DEFAULT 0,
+      incomplete      INTEGER DEFAULT 0,
+      warning         TEXT,
+      error_msg       TEXT,
+      interpretation  TEXT,
+      request_log_id  TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `)
+  database.run('CREATE INDEX IF NOT EXISTS idx_readings_user_id ON readings(user_id)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_readings_created_at ON readings(created_at DESC)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_readings_status ON readings(status)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_readings_request_log_id ON readings(request_log_id)')
 }
 
 function initTestLevelDefinitions(database: Database): void {

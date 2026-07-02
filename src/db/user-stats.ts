@@ -310,3 +310,19 @@ export async function initMissingUserStats(): Promise<void> {
   saveDb()
   log.info({ count: missingIds.length }, 'Migrated existing users with default stats')
 }
+
+/**
+ * 退还一次解读额度（异步任务失败时调用）
+ * daily_quota_used 和 total_readings 减 1，不低于 0
+ */
+export async function refundQuota(userId: string): Promise<void> {
+  const db = await getDb()
+  db.run(
+    `UPDATE user_stats 
+     SET daily_quota_used = MAX(0, daily_quota_used - 1),
+         total_readings = MAX(0, total_readings - 1)
+     WHERE user_id = ?`,
+    [userId],
+  )
+  saveDb()
+}

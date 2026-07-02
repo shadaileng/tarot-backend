@@ -18,6 +18,7 @@ import { getTemplate } from './poster/templates/index.js'
 import { metrics } from './monitor/index.js'
 import { getLogger } from './logger.js'
 import { readingHandler } from './reading/handler.js'
+import { startReadingHandler, getReadingResultHandler, recoverPendingTasks } from './reading/async-handler.js'
 import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } from './reading/models.js'
 import { queryRequestLogs, getRequestLogById, getRequestStats } from './db/request-log.js'
 import { queryReadingLogs, getReadingLogById } from './db/reading-log.js'
@@ -648,6 +649,11 @@ app.post('/api/admin/admins/:id/reset-password', adminAuthMiddleware, async (req
 
 // ========== 业务接口（JWT 鉴权 + 频率限制）==========
 
+// 异步解读（新版，推荐）
+app.post('/api/reading/start', jwtAuthMiddleware, quotaMiddleware, startReadingHandler)
+app.get('/api/reading/result/:taskId', jwtAuthMiddleware, getReadingResultHandler)
+
+// 同步解读（旧版，保留兼容）
 app.post('/api/reading', quotaMiddleware, rateLimitMiddleware, readingHandler)
 
 app.post('/api/poster', async (req, res) => {
@@ -1562,6 +1568,9 @@ async function start(): Promise<void> {
 
   // 初始化管理员账号（首次部署时，默认 admin / admin@123456）
   await initAdminIfNeeded()
+
+  // 恢复服务重启前的 pending 异步解读任务
+  recoverPendingTasks().catch((e) => log.error({ err: e }, 'Failed to recover pending tasks'))
 
   // 输出配置来源分组（from_env / from_default / from_user）
   {
