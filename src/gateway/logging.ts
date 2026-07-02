@@ -8,6 +8,15 @@ const log = getLogger('gateway')
 
 const SKIP_PATHS = ['/', '/api/health', '/api/metrics', '/api/logs']
 
+function resolveTarget(path: string): string {
+  if (path === '/api/reading') return 'reading'
+  if (path.startsWith('/api/poster')) return 'poster'
+  if (path.startsWith('/api/auth') || path.startsWith('/admin/auth')) return 'auth'
+  if (path.startsWith('/api/user') || path === '/api/checkin' || path.startsWith('/api/tasks') || path.startsWith('/api/invite')) return 'user'
+  if (path.startsWith('/api/admin')) return 'admin'
+  return 'other'
+}
+
 export function loggingMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (SKIP_PATHS.includes(req.path) || req.path.startsWith('/api/logs/')) {
     next()
@@ -17,7 +26,7 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
   const start = Date.now()
   const logId = crypto.randomUUID()
   const requestBody = req.body || {}
-  const target = req.path === '/api/reading' ? 'reading' : req.path === '/api/poster' ? 'poster' : 'other'
+  const target = resolveTarget(req.path)
   const ip = req.ip || req.socket.remoteAddress || ''
 
   // 将 logId 注入到 req，供下游 handler 串联日志
