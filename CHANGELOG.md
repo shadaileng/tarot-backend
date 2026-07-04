@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.1] - 2026-07-04
+
+### Fixed
+
+- 补充缺失的审计日志埋点：解读积分奖励（`points_earn`）、用户升级（`level_up`）、每日额度重置（`quota_daily_reset`）
+- 签到审计日志补充 `actorName` 字段（连续签到天数）
+
 ## [2.23.0] - 2026-07-04
 
 ### Added

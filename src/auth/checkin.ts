@@ -103,6 +103,7 @@ export async function checkinHandler(req: Request, res: Response): Promise<void>
     insertAuditLog({
       actorType: 'user',
       actorId: userId,
+      actorName: streak > 1 ? `连续${streak}天` : undefined,
       action: 'checkin',
       targetType: 'user',
       targetId: userId,

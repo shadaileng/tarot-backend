@@ -92,6 +92,15 @@ export async function quotaMiddleware(req: Request, res: Response, next: NextFun
         targetType: 'reading',
         ipAddress: req.ip,
       }).catch((e: Error) => log.warn({ err: e }, 'Failed to insert audit log'))
+      insertAuditLog({
+        actorType: 'system',
+        actorId: null,
+        action: 'points_earn',
+        targetType: 'user',
+        targetId: userId,
+        newValue: { points: 2, reason: 'reading_reward' },
+        ipAddress: req.ip,
+      }).catch((e: Error) => log.warn({ err: e }, 'Failed to insert audit log'))
     } else {
       const finishHandler = () => {
         if (res.statusCode === 200) {
@@ -105,6 +114,15 @@ export async function quotaMiddleware(req: Request, res: Response, next: NextFun
             actorId: userId,
             action: 'quota_consume',
             targetType: 'reading',
+            ipAddress: req.ip,
+          }).catch((e: Error) => log.warn({ err: e }, 'Failed to insert audit log'))
+          insertAuditLog({
+            actorType: 'system',
+            actorId: null,
+            action: 'points_earn',
+            targetType: 'user',
+            targetId: userId,
+            newValue: { points: 2, reason: 'reading_reward' },
             ipAddress: req.ip,
           }).catch((e: Error) => log.warn({ err: e }, 'Failed to insert audit log'))
         }

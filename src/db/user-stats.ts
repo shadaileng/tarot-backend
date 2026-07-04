@@ -1,6 +1,7 @@
 import crypto from 'crypto'
 import { getDb, saveDb } from './index.js'
 import { getLogger } from '../logger.js'
+import { insertAuditLog } from './audit.js'
 
 const log = getLogger('DB:UserStats')
 
@@ -153,6 +154,15 @@ export async function addPoints(userId: string, delta: number): Promise<{ newPoi
 
   if (leveledUp) {
     log.info({ userId, oldLevel: stats.level, newLevel: newLevelDef.level, points: newPoints }, 'User leveled up')
+    insertAuditLog({
+      actorType: 'system',
+      actorId: null,
+      action: 'level_up',
+      targetType: 'user',
+      targetId: userId,
+      oldValue: { level: stats.level, title: stats.level },
+      newValue: { level: newLevelDef.level, title: newLevelDef.title, points: newPoints },
+    })
   }
 
   return { newPoints: Math.max(0, newPoints), newLevel: newLevelDef.level, leveledUp }
@@ -193,6 +203,15 @@ export async function resetDailyQuotaIfNeeded(userId: string): Promise<void> {
     db.run('UPDATE user_stats SET daily_quota_used = 0, quota_reset_date = ? WHERE user_id = ?',
       [today, userId])
     saveDb()
+    insertAuditLog({
+      actorType: 'system',
+      actorId: null,
+      action: 'quota_daily_reset',
+      targetType: 'user',
+      targetId: userId,
+      oldValue: { daily_quota_used: stats.daily_quota_used, quota_reset_date: stats.quota_reset_date },
+      newValue: { daily_quota_used: 0, quota_reset_date: today },
+    })
   }
 }
 
