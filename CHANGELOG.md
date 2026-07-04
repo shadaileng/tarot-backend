@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.22.1] - 2026-07-04
+
+### Fixed
+
+- 修复 CORS 预检响应 `Access-Control-Allow-Methods` 未包含 `PATCH` 方法，导致 H5 端 `PATCH /api/user/records/:id` 请求被浏览器拦截
+
 ## [2.21.0] - 2026-07-03
 
 ### Added
