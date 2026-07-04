@@ -60,7 +60,7 @@ export async function insertReadingLog(params: InsertReadingLogParams): Promise<
   saveDb()
 }
 
-function maskEmail(email: string | null): string | null {
+export function maskEmail(email: string | null): string | null {
   if (!email) return null
   const [local, domain] = email.split('@')
   if (!domain) return email

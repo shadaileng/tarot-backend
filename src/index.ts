@@ -18,10 +18,11 @@ import { getTemplate } from './poster/templates/index.js'
 import { metrics } from './monitor/index.js'
 import { getLogger } from './logger.js'
 import { readingHandler } from './reading/handler.js'
-import { startReadingHandler, getReadingResultHandler, cancelReadingHandler, recoverPendingTasks } from './reading/async-handler.js'
+import { startReadingHandler, getReadingResultHandler, cancelReadingHandler, recoverPendingTasks, adminCancelTaskHandler } from './reading/async-handler.js'
 import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } from './reading/models.js'
 import { queryRequestLogs, getRequestLogById, getRequestStats } from './db/request-log.js'
 import { queryReadingLogs, getReadingLogById } from './db/reading-log.js'
+import { listReadingTasks, getReadingTaskById, getAsyncTaskStats } from './db/reading-task.js'
 import { queryUsers, unbindEmail, softDeleteUser, restoreUser } from './db/user.js'
 import { getAllConfig, upsertConfig, initDefaultConfig, loadUserConfig } from './db/config.js'
 import { getAllPageSections, updatePageSectionVisibility } from './db/page-sections.js'
@@ -812,6 +813,52 @@ app.get('/api/reading-logs/:id', adminAuthMiddleware, async (req, res) => {
   }
   res.json(log)
 })
+
+// ========== 解读任务管理（Admin JWT）==========
+
+app.get('/api/admin/reading-tasks', adminAuthMiddleware, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
+    const status = req.query.status as string | undefined
+    const userId = req.query.userId as string | undefined
+    const keyword = req.query.keyword as string | undefined
+    const dateFrom = req.query.dateFrom as string | undefined
+    const dateTo = req.query.dateTo as string | undefined
+
+    const [result, stats] = await Promise.all([
+      listReadingTasks({ page, limit, status, userId, keyword, dateFrom, dateTo }),
+      getAsyncTaskStats(),
+    ])
+
+    res.json({
+      total: result.total,
+      page,
+      limit,
+      data: result.data,
+      stats,
+    })
+  } catch (err) {
+    log.error({ err }, 'Failed to list reading tasks')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取解读任务列表失败' })
+  }
+})
+
+app.get('/api/admin/reading-tasks/:taskId', adminAuthMiddleware, async (req, res) => {
+  try {
+    const task = await getReadingTaskById(req.params.taskId)
+    if (!task) {
+      res.status(404).json({ error: 'Task not found' })
+      return
+    }
+    res.json(task)
+  } catch (err) {
+    log.error({ err }, 'Failed to get reading task detail')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取任务详情失败' })
+  }
+})
+
+app.post('/api/admin/reading-tasks/:taskId/cancel', adminAuthMiddleware, adminCancelTaskHandler)
 
 app.get('/api/admin/users', adminAuthMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1

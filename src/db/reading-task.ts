@@ -1,5 +1,6 @@
 import { getDb, saveDb } from './index.js'
 import { v4 as uuidv4 } from 'uuid'
+import { maskEmail } from './reading-log.js'
 
 export interface ReadingTaskRow {
   id: string
@@ -121,6 +122,144 @@ export async function cancelReadingTask(
     return { ok: false, alreadyFinished: true }
   }
 
+  saveDb()
+  return { ok: true, alreadyFinished: false }
+}
+
+// ========== Admin 端查询 ==========
+
+export interface ReadingTaskListRow {
+  id: string
+  created_at: string
+  updated_at: string | null
+  user_id: string
+  user_nickname: string | null
+  user_email: string | null
+  user_avatar: string | null
+  spread_type: string
+  question: string | null
+  cards_json: string
+  reading: string | null
+  model: string | null
+  status: string
+  incomplete: number
+  warning: string | null
+  error_msg: string | null
+  duration_ms: number | null
+}
+
+export interface ReadingTaskFilter {
+  page?: number
+  limit?: number
+  status?: string
+  userId?: string
+  keyword?: string
+  dateFrom?: string
+  dateTo?: string
+}
+
+/** Admin 分页查询解读任务列表 */
+export async function listReadingTasks(filter: ReadingTaskFilter): Promise<{ total: number; data: ReadingTaskListRow[] }> {
+  const db = await getDb()
+  const page = filter.page || 1
+  const limit = Math.min(filter.limit || 50, 200)
+  const offset = (page - 1) * limit
+
+  const where: string[] = []
+  const params: any[] = []
+
+  if (filter.status) {
+    where.push('r.status = ?')
+    params.push(filter.status)
+  }
+  if (filter.userId) {
+    where.push('r.user_id = ?')
+    params.push(filter.userId)
+  }
+  if (filter.keyword) {
+    where.push('r.question LIKE ?')
+    params.push(`%${filter.keyword}%`)
+  }
+  if (filter.dateFrom) {
+    where.push('r.created_at >= ?')
+    params.push(filter.dateFrom)
+  }
+  if (filter.dateTo) {
+    where.push('r.created_at <= ?')
+    params.push(filter.dateTo)
+  }
+
+  const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : ''
+
+  // 总数
+  const countSql = `SELECT COUNT(*) as cnt FROM readings r ${whereClause}`
+  const countResult = db.exec(countSql, params)
+  const total = countResult.length > 0 && countResult[0].values.length > 0
+    ? Number(countResult[0].values[0][0])
+    : 0
+
+  // 列表（JOIN users，计算耗时）
+  const listSql = `SELECT r.*, 
+    u.nickname AS user_nickname,
+    u.email AS user_email,
+    u.avatar_url AS user_avatar,
+    CASE WHEN r.status IN ('completed','failed','cancelled') AND r.updated_at IS NOT NULL
+      THEN (julianday(r.updated_at) - julianday(r.created_at)) * 86400000
+      ELSE NULL END AS duration_ms
+  FROM readings r
+  LEFT JOIN users u ON r.user_id = u.id
+  ${whereClause}
+  ORDER BY r.created_at DESC LIMIT ? OFFSET ?`
+
+  const stmt = db.prepare(listSql)
+  stmt.bind([...params, limit, offset])
+  const rows: ReadingTaskListRow[] = []
+  while (stmt.step()) {
+    const row = stmt.getAsObject() as unknown as ReadingTaskListRow
+    row.user_email = maskEmail(row.user_email)
+    rows.push(row)
+  }
+  stmt.free()
+
+  return { total, data: rows }
+}
+
+/** Admin 获取单个任务详情（不限 userId） */
+export async function getReadingTaskById(taskId: string): Promise<ReadingTaskListRow | null> {
+  const db = await getDb()
+  const stmt = db.prepare(`SELECT r.*,
+    u.nickname AS user_nickname,
+    u.email AS user_email,
+    u.avatar_url AS user_avatar,
+    CASE WHEN r.status IN ('completed','failed','cancelled') AND r.updated_at IS NOT NULL
+      THEN (julianday(r.updated_at) - julianday(r.created_at)) * 86400000
+      ELSE NULL END AS duration_ms
+  FROM readings r
+  LEFT JOIN users u ON r.user_id = u.id
+  WHERE r.id = ?`)
+  stmt.bind([taskId])
+  let row: ReadingTaskListRow | null = null
+  if (stmt.step()) {
+    row = stmt.getAsObject() as unknown as ReadingTaskListRow
+    row.user_email = maskEmail(row.user_email)
+  }
+  stmt.free()
+  return row
+}
+
+/** Admin 强制取消任务（不校验 userId） */
+export async function adminCancelReadingTask(taskId: string): Promise<{ ok: boolean; alreadyFinished: boolean }> {
+  const db = await getDb()
+  db.run(
+    `UPDATE readings
+     SET status = 'cancelled', error_msg = 'Cancelled by admin', updated_at = ?
+     WHERE id = ? AND status = 'pending'`,
+    [new Date().toISOString(), taskId],
+  )
+  const changes = (db as any).getRowsModified?.() ?? 0
+  if (changes === 0) {
+    return { ok: false, alreadyFinished: true }
+  }
   saveDb()
   return { ok: true, alreadyFinished: false }
 }

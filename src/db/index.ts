@@ -469,8 +469,6 @@ export function initDefaultPageSections(): void {
 /** 初始化 menus 默认数据 */
 export function initDefaultMenus(): void {
   if (!db) return
-  const existing = db.exec('SELECT COUNT(*) as count FROM menus')
-  if (Number(existing[0]?.values[0]?.[0] ?? 0) > 0) return
 
   const now = new Date().toISOString()
 
@@ -481,7 +479,7 @@ export function initDefaultMenus(): void {
     ['menu-operation', '运营管理', null, 3],
   ]
   const grpStmt = db.prepare(`
-    INSERT INTO menus (id, parent_id, route_name, label, icon, sort_order, is_visible, require_role, created_at, updated_at)
+    INSERT OR IGNORE INTO menus (id, parent_id, route_name, label, icon, sort_order, is_visible, require_role, created_at, updated_at)
     VALUES (?, NULL, NULL, ?, ?, ?, 1, NULL, ?, ?)
   `)
   const grpIcons: Record<string, string> = {
@@ -518,9 +516,10 @@ export function initDefaultMenus(): void {
     ['menu-stats-trends',     'menu-operation', 'stats-trends',     '趋势统计', 'M18 20V10M12 20V4M6 20v-6', 4, null],
     ['menu-feedback',         'menu-operation', 'feedback',         '意见反馈', 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z', 5, null],
     ['menu-page-sections',    'menu-operation', 'page-sections',    '页面管理', 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', 6, null],
+    ['menu-reading-tasks',    'menu-operation', 'reading-tasks',   '解读任务', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', 7, null],
   ]
   const itemStmt = db.prepare(`
-    INSERT INTO menus (id, parent_id, route_name, label, icon, sort_order, is_visible, require_role, created_at, updated_at)
+    INSERT OR IGNORE INTO menus (id, parent_id, route_name, label, icon, sort_order, is_visible, require_role, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
   `)
   for (const item of items) {

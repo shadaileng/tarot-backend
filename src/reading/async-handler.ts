@@ -10,6 +10,8 @@ import {
   completeReadingTask,
   failReadingTask,
   cancelReadingTask,
+  getReadingTaskById,
+  adminCancelReadingTask,
 } from '../db/reading-task.js'
 
 const log = getLogger('reading:async')
@@ -207,6 +209,51 @@ async function processTask(
     log.error({ taskId, err, duration: Date.now() - startTime },
       'Async reading task crashed — quota refunded')
   }
+}
+
+/**
+ * POST /api/admin/reading-tasks/:taskId/cancel
+ * 管理员强制取消任务（不校验 userId，含退额度）
+ */
+export async function adminCancelTaskHandler(req: Request, res: Response): Promise<void> {
+  const { taskId } = req.params
+
+  const { ok, alreadyFinished } = await adminCancelReadingTask(taskId)
+
+  if (alreadyFinished) {
+    const task = await getReadingTaskById(taskId)
+    if (!task) {
+      res.status(404).json({ error: 'Task not found' })
+      return
+    }
+    res.json({
+      taskId,
+      status: task.status,
+      quotaRefunded: false,
+      message: 'Task already finished',
+    })
+    return
+  }
+
+  if (!ok) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+
+  // Abort 正在进行的 Gemini 调用
+  abortTask(taskId)
+
+  // 退还额度
+  const task = await getReadingTaskById(taskId)
+  if (task) {
+    await refundQuota(task.user_id).catch((e) =>
+      log.warn({ taskId, err: e }, 'Failed to refund quota on admin cancel'),
+    )
+  }
+
+  log.info({ taskId }, 'Reading task cancelled by admin — quota refunded')
+
+  res.json({ taskId, status: 'cancelled', quotaRefunded: true })
 }
 
 /**
