@@ -61,6 +61,17 @@ export async function bindEmailHandler(req: Request, res: Response): Promise<voi
       // 密码正确 → 合并账号（迁移占卜记录，删除旧账号）
       await mergeAccount(userId, existing.id)
       log.info({ userId, mergedFrom: existing.id, email }, 'Account merged on email bind')
+      // 记录审计日志
+      insertAuditLog({
+        actorType: 'user',
+        actorId: userId,
+        action: 'user_merge_account',
+        targetType: 'user',
+        targetId: userId,
+        oldValue: { sourceUserId: existing.id, sourceEmail: email },
+        newValue: { targetUserId: userId, mergedFrom: existing.id },
+        ipAddress: req.ip,
+      })
       res.json({
         message: '邮箱绑定成功，已与已有账号合并',
         email,

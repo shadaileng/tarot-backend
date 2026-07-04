@@ -473,6 +473,16 @@ app.post('/admin/auth/change-password', adminAuthMiddleware, async (req, res) =>
       res.status(400).json({ error: 'CHANGE_PASSWORD_FAILED', message: result.error })
       return
     }
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_change_password',
+      targetType: 'admin',
+      targetId: adminId,
+      ipAddress: req.ip,
+    })
     res.json({ message: '密码修改成功，请使用新密码重新登录' })
   } catch (err) {
     log.error({ err }, 'Change password failed')
@@ -935,6 +945,16 @@ app.get('/api/admin/users', adminAuthMiddleware, async (req, res) => {
 app.put('/api/admin/users/:id/unbind-email', adminAuthMiddleware, async (req, res) => {
   try {
     await unbindEmail(req.params.id)
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_unbind_email',
+      targetType: 'user',
+      targetId: req.params.id,
+      ipAddress: req.ip,
+    })
     res.json({ message: '邮箱已解除绑定' })
   } catch (err: any) {
     if (err.message === '纯邮箱用户无法解除邮箱绑定') {
@@ -1365,6 +1385,16 @@ app.put('/api/admin/invite-records/:id/complete', adminAuthMiddleware, async (re
     stmt.step()
     stmt.free()
     saveDb()
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_complete_invite',
+      targetType: 'invite_record',
+      targetId: req.params.id,
+      ipAddress: req.ip,
+    })
     res.json({ message: '邀请已标记为完成' })
   } catch (err) {
     log.error({ err }, 'Failed to complete invite')
@@ -1378,6 +1408,16 @@ app.delete('/api/admin/invite-records/:id', adminAuthMiddleware, async (req, res
     const db = await getDb()
     db.run('DELETE FROM invite_records WHERE id = ?', [req.params.id])
     saveDb()
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_delete_invite',
+      targetType: 'invite_record',
+      targetId: req.params.id,
+      ipAddress: req.ip,
+    })
     res.json({ message: '邀请记录已删除' })
   } catch (err) {
     log.error({ err }, 'Failed to delete invite record')
@@ -1532,6 +1572,17 @@ app.put('/api/admin/page-sections/:id', adminAuthMiddleware, async (req, res) =>
     }
     await updatePageSectionVisibility(req.params.id, visible)
     saveDb()
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_update_page_section',
+      targetType: 'page_section',
+      targetId: req.params.id,
+      newValue: { visible },
+      ipAddress: req.ip,
+    })
     res.json({ message: '已更新' })
   } catch (err) {
     log.error({ err }, 'Failed to update page section')
@@ -1612,6 +1663,15 @@ app.delete('/api/user/records/:id', jwtAuthMiddleware, async (req, res) => {
     res.status(404).json({ error: 'Record not found' })
     return
   }
+  // 记录审计日志
+  insertAuditLog({
+    actorType: 'user',
+    actorId: req.userId!,
+    action: 'user_delete_record',
+    targetType: 'reading_record',
+    targetId: req.params.id,
+    ipAddress: req.ip,
+  })
   res.json({ message: '删除成功' })
 })
 
@@ -1826,6 +1886,15 @@ app.post('/api/upload/feedback', jwtAuthMiddleware, (req: Request, res: Response
 
     const files = (req as any).files as any[]
     const urls = files.map((f: any) => `/uploads/feedback/${f.filename}`)
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'user',
+      actorId: req.userId!,
+      action: 'user_upload_image',
+      targetType: 'feedback_image',
+      newValue: { fileCount: files.length },
+      ipAddress: req.ip,
+    })
     res.json({ urls })
   })
 })

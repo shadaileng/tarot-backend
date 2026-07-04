@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
 import { getLogger } from '../logger.js'
 import { getDb } from '../db/index.js'
+import { insertAuditLog } from '../db/audit.js'
 import {
   createFeedback,
   getFeedbackById,
@@ -32,6 +33,17 @@ export async function handleCreateFeedback(req: Request, res: Response): Promise
       category,
       content: content.trim(),
       images,
+    })
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'user',
+      actorId: req.userId!,
+      action: 'user_create_feedback',
+      targetType: 'feedback',
+      targetId: feedback.id,
+      newValue: { category, content: content.trim(), imageCount: images?.length || 0 },
+      ipAddress: req.ip,
     })
 
     res.status(201).json({
@@ -183,6 +195,18 @@ export async function handleAdminReply(req: Request, res: Response): Promise<voi
       res.status(404).json({ error: 'NOT_FOUND', message: '反馈不存在' })
       return
     }
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_reply_feedback',
+      targetType: 'feedback',
+      targetId: req.params.id,
+      targetName: feedback.user_id || null,
+      newValue: { reply: reply.trim() },
+      ipAddress: req.ip,
+    })
     res.json({ message: '回复成功' })
   } catch (err) {
     log.error({ err }, 'Failed to reply feedback')
@@ -204,11 +228,24 @@ export async function handleAdminUpdateStatus(req: Request, res: Response): Prom
   }
 
   try {
+    const prevStatus = (await getFeedbackById(req.params.id))?.status
     const feedback = await updateFeedbackStatus(req.params.id, status)
     if (!feedback) {
       res.status(404).json({ error: 'NOT_FOUND', message: '反馈不存在' })
       return
     }
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_update_feedback_status',
+      targetType: 'feedback',
+      targetId: req.params.id,
+      oldValue: prevStatus ? { status: prevStatus } : null,
+      newValue: { status },
+      ipAddress: req.ip,
+    })
     res.json({ message: '状态已更新' })
   } catch (err) {
     log.error({ err }, 'Failed to update feedback status')

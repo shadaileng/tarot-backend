@@ -4,6 +4,7 @@ import { callGeminiReading } from './models.js'
 import { getLogger } from '../logger.js'
 import type { ReadingRequestBody } from './types.js'
 import { refundQuota } from '../db/user-stats.js'
+import { insertAuditLog } from '../db/audit.js'
 import {
   createReadingTask,
   getReadingTask,
@@ -137,6 +138,16 @@ export async function cancelReadingHandler(req: Request, res: Response): Promise
     log.warn({ taskId, err: e }, 'Failed to refund quota on cancel'),
   )
 
+  // 记录审计日志
+  insertAuditLog({
+    actorType: 'user',
+    actorId: userId,
+    action: 'user_cancel_reading',
+    targetType: 'reading_task',
+    targetId: taskId,
+    ipAddress: req.ip,
+  })
+
   log.info({ taskId, userId }, 'Reading task cancelled by user — quota refunded')
 
   res.json({ taskId, status: 'cancelled', quotaRefunded: true })
@@ -250,6 +261,17 @@ export async function adminCancelTaskHandler(req: Request, res: Response): Promi
       log.warn({ taskId, err: e }, 'Failed to refund quota on admin cancel'),
     )
   }
+
+  // 记录审计日志
+  insertAuditLog({
+    actorType: 'admin',
+    actorId: (req as any).adminId,
+    actorName: (req as any).adminUsername,
+    action: 'admin_cancel_reading',
+    targetType: 'reading_task',
+    targetId: taskId,
+    ipAddress: req.ip,
+  })
 
   log.info({ taskId }, 'Reading task cancelled by admin — quota refunded')
 

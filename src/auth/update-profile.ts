@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express'
 import { updateProfile as updateUserProfile, toUserInfo } from '../db/user.js'
+import { insertAuditLog } from '../db/audit.js'
 import { getLogger } from '../logger.js'
 import type { UpdateProfileRequest } from '../types/auth.js'
 
@@ -64,6 +65,17 @@ export async function updateProfileHandler(req: Request, res: Response): Promise
     }
 
     log.info({ userId, nickname, avatarUrl, gender: parsedGender, birthday }, 'Profile updated')
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'user',
+      actorId: userId,
+      action: 'user_update_profile',
+      targetType: 'user',
+      targetId: userId,
+      newValue: { nickname: nickname?.trim(), avatarUrl, gender: parsedGender, birthday },
+      ipAddress: req.ip,
+    })
 
     res.json({ user: toUserInfo(updated) })
   } catch (err) {
