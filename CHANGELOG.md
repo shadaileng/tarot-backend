@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.2] - 2026-07-04
+
+### Fixed
+
+- 修复审计日志分类筛选仅前端过滤、未传递到后端的问题：选分类未选操作时后端实际查全量
+- `queryAuditLogs` 的 `action` 参数支持 `string | string[]`，数组时使用 SQL `IN (...)` 精确匹配
+- `/api/admin/audit-logs` 接口支持 `?action=a,b,c` 逗号分隔或 `?action=a&action=b` 多值形式
+
 ## [2.23.1] - 2026-07-04
 
 ### Fixed

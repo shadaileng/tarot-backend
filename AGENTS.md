@@ -187,6 +187,8 @@ POST /poster  { cards[], question, spreadName, ... }
 | PUT | `/api/admin/users/:id/unbind-email` | 解除邮箱绑定 | Admin JWT | ❌ |
 | DELETE | `/api/admin/users/:id` | 软删除用户 | Admin JWT | ❌ |
 | PUT | `/api/admin/users/:id/restore` | 恢复已删除用户 | Admin JWT | ❌ |
+| GET | `/api/admin/audit-logs` | 审计日志分页查询 | Admin JWT | ❌ |
+| POST | `/api/admin/audit-logs/clean` | 手动清理过期审计日志 | Admin JWT | ❌ |
 
 ### POST /reading
 
@@ -477,6 +479,17 @@ Admin JWT 保护，详见 `tarot-admin` 的 AGENTS.md。
 | 解除邮箱 | `PUT /api/admin/users/:id/unbind-email` | 清空邮箱/密码，自动恢复被合并的源用户 |
 | 软删除 | `DELETE /api/admin/users/:id` | 设 `deleted_at=now`，绑定邮箱的微信用户先解绑 |
 | 恢复 | `PUT /api/admin/users/:id/restore` | 设 `deleted_at=NULL` |
+
+### 审计日志（管理端）
+
+| 操作 | 端点 | 说明 |
+|------|------|------|
+| 审计日志列表 | `GET /api/admin/audit-logs` | 分页 + 多维筛选：`actorType` / `actorId` / `action`（支持数组）/ `targetType` / `dateRange` |
+| 手动清理 | `POST /api/admin/audit-logs/clean` | 按 `retentionDays` 清理过期日志 |
+
+**`action` 参数支持两种形式**：
+- 单值：`?action=admin_login`
+- 多值：`?action=admin_login,admin_create_admin`（逗号分隔）或 `?action=admin_login&action=admin_create_admin`（多 key）→ 后端解析为数组 → SQL `IN (...)` 精确匹配
 
 ### 账号生命周期
 
