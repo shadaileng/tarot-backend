@@ -73,6 +73,7 @@ export async function emailRegisterHandler(req: Request, res: Response): Promise
       action: 'user_register',
       targetType: 'user',
       targetId: user.id,
+      oldValue: null,
       newValue: { email, nickname: user.nickname },
       ipAddress: req.ip,
     })
