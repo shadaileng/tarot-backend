@@ -1793,7 +1793,16 @@ app.get('/api/admin/audit-logs', adminAuthMiddleware, async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
     const actorType = req.query.actorType as string | undefined
     const actorId = req.query.actorId as string | undefined
-    const action = req.query.action as string | undefined
+    // 支持逗号分隔或数组形式的 action（如 ?action=a,b,c 或 ?action=a&action=b）
+    const rawAction = req.query.action
+    let action: string | string[] | undefined
+    if (Array.isArray(rawAction)) {
+      action = rawAction as string[]
+    } else if (typeof rawAction === 'string' && rawAction.includes(',')) {
+      action = rawAction.split(',').map(s => s.trim()).filter(Boolean)
+    } else if (typeof rawAction === 'string') {
+      action = rawAction
+    }
     const targetType = req.query.targetType as string | undefined
     const startDate = req.query.startDate as string | undefined
     const endDate = req.query.endDate as string | undefined

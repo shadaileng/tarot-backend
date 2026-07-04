@@ -70,7 +70,7 @@ interface QueryAuditLogsParams {
   limit?: number
   actorType?: string
   actorId?: string
-  action?: string
+  action?: string | string[]
   targetType?: string
   targetId?: string
   startDate?: string
@@ -103,8 +103,12 @@ export async function queryAuditLogs(params: QueryAuditLogsParams): Promise<{
     bindParams.push(params.actorId)
   }
   if (params.action) {
-    where.push('action = ?')
-    bindParams.push(params.action)
+    const actions = Array.isArray(params.action) ? params.action : [params.action]
+    if (actions.length > 0) {
+      const placeholders = actions.map(() => '?').join(', ')
+      where.push(`action IN (${placeholders})`)
+      bindParams.push(...actions)
+    }
   }
   if (params.targetType) {
     where.push('target_type = ?')
