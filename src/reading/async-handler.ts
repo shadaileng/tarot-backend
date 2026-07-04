@@ -9,9 +9,30 @@ import {
   getReadingTask,
   completeReadingTask,
   failReadingTask,
+  cancelReadingTask,
 } from '../db/reading-task.js'
 
 const log = getLogger('reading:async')
+
+/**
+ * 活跃任务注册表
+ * key = taskId, value = AbortController
+ * 用于用户/后台主动取消时 abort 正在进行的 Gemini 调用
+ */
+const activeTasks = new Map<string, AbortController>()
+
+/**
+ * 取消指定任务
+ * @returns true 表示任务存在且已 abort，false 表示任务不存在或已结束
+ */
+export function abortTask(taskId: string): boolean {
+  const controller = activeTasks.get(taskId)
+  if (!controller) return false
+  controller.abort()
+  activeTasks.delete(taskId)
+  log.info({ taskId }, 'Task aborted by external request')
+  return true
+}
 
 /**
  * POST /api/reading/start
@@ -43,10 +64,11 @@ export async function startReadingHandler(req: Request, res: Response): Promise<
 
   log.info({ taskId, userId, cardCount: cards.length }, 'Reading task created, starting async generation')
 
-  // 异步执行 Gemini 调用（不阻塞响应）
-  processTask(taskId, userId, question || '', cards).catch((err) => {
-    log.error({ taskId, err }, 'Async task processing crashed')
-  })
+  // 注册 AbortController 并异步执行 Gemini 调用（不阻塞响应）
+  const controller = new AbortController()
+  activeTasks.set(taskId, controller)
+  processTask(taskId, userId, question || '', cards, controller.signal)
+    .finally(() => activeTasks.delete(taskId))
 
   res.json({ taskId, status: 'pending' })
 }
@@ -78,18 +100,67 @@ export async function getReadingResultHandler(req: Request, res: Response): Prom
 }
 
 /**
- * 后台异步处理任务
+ * POST /api/reading/cancel/:taskId
+ * 取消进行中的解读任务（用户/后台手动调用）
+ */
+export async function cancelReadingHandler(req: Request, res: Response): Promise<void> {
+  const { taskId } = req.params
+  const userId = (req as any).userId as string
+
+  // 1. 原子化更新数据库状态
+  const { ok, alreadyFinished } = await cancelReadingTask(taskId, userId)
+
+  if (alreadyFinished) {
+    // 任务已结束，返回当前状态
+    const row = await getReadingTask(taskId, userId)
+    res.json({
+      taskId,
+      status: row?.status || 'unknown',
+      quotaRefunded: false,
+      message: 'Task already finished',
+    })
+    return
+  }
+
+  if (!ok) {
+    res.status(404).json({ error: 'Task not found' })
+    return
+  }
+
+  // 2. Abort 正在进行的 Gemini 调用
+  abortTask(taskId)
+
+  // 3. 退还额度
+  await refundQuota(userId).catch((e) =>
+    log.warn({ taskId, err: e }, 'Failed to refund quota on cancel'),
+  )
+
+  log.info({ taskId, userId }, 'Reading task cancelled by user — quota refunded')
+
+  res.json({ taskId, status: 'cancelled', quotaRefunded: true })
+}
+
+/**
+ * 后台异步处理任务（无超时限制）
+ * @param signal - AbortSignal，用于接收外部取消信号
  */
 async function processTask(
   taskId: string,
   userId: string,
   question: string,
   cards: any[],
+  signal: AbortSignal,
 ): Promise<void> {
   const startTime = Date.now()
 
   try {
-    const result = await callGeminiReading(config.geminiApiKey!, question, cards)
+    const result = await callGeminiReading(config.geminiApiKey!, question, cards, signal)
+
+    // 检查是否在 Gemini 调用期间被取消
+    if (signal.aborted) {
+      log.info({ taskId }, 'Task was cancelled during Gemini call, skipping completion')
+      return
+    }
 
     if (result.success) {
       await completeReadingTask({
@@ -120,6 +191,14 @@ async function processTask(
       }, 'Async reading task failed — quota refunded')
     }
   } catch (err: any) {
+    // AbortError：任务已被 cancelReadingHandler 处理（cancelReadingTask + refundQuota 已执行）
+    // 这里只需跳过，不做重复操作
+    if (err.name === 'AbortError') {
+      log.info({ taskId }, 'Task aborted via AbortController (cancellation already handled)')
+      return
+    }
+
+    // 其他未预期的异常
     await failReadingTask(taskId, err.message || 'Internal error')
     await refundQuota(userId).catch((e) =>
       log.warn({ taskId, err: e }, 'Failed to refund quota on crash'),
@@ -136,9 +215,12 @@ async function processTask(
  */
 export async function recoverPendingTasks(): Promise<void> {
   const db = await (await import('../db/index.js')).getDb()
-  const rows = db
-    .prepare("SELECT * FROM readings WHERE status = 'pending'")
-    .all() as any[]
+  const stmt = db.prepare("SELECT * FROM readings WHERE status = 'pending'")
+  const rows: any[] = []
+  while (stmt.step()) {
+    rows.push(stmt.getAsObject())
+  }
+  stmt.free()
 
   if (rows.length === 0) return
 
@@ -147,7 +229,8 @@ export async function recoverPendingTasks(): Promise<void> {
   // 使用 import 避免循环依赖
   for (const row of rows) {
     const cards = JSON.parse(row.cards_json)
-    processTask(row.id, row.user_id, row.question || '', cards).catch((err) => {
+    const signal = new AbortController().signal  // 恢复的任务不用外部取消
+    processTask(row.id, row.user_id, row.question || '', cards, signal).catch((err) => {
       log.error({ taskId: row.id, err }, 'Recovered task processing crashed')
     })
   }

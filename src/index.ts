@@ -18,7 +18,7 @@ import { getTemplate } from './poster/templates/index.js'
 import { metrics } from './monitor/index.js'
 import { getLogger } from './logger.js'
 import { readingHandler } from './reading/handler.js'
-import { startReadingHandler, getReadingResultHandler, recoverPendingTasks } from './reading/async-handler.js'
+import { startReadingHandler, getReadingResultHandler, cancelReadingHandler, recoverPendingTasks } from './reading/async-handler.js'
 import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } from './reading/models.js'
 import { queryRequestLogs, getRequestLogById, getRequestStats } from './db/request-log.js'
 import { queryReadingLogs, getReadingLogById } from './db/reading-log.js'
@@ -652,6 +652,7 @@ app.post('/api/admin/admins/:id/reset-password', adminAuthMiddleware, async (req
 // 异步解读（新版，推荐）
 app.post('/api/reading/start', jwtAuthMiddleware, quotaMiddleware, startReadingHandler)
 app.get('/api/reading/result/:taskId', jwtAuthMiddleware, getReadingResultHandler)
+app.post('/api/reading/cancel/:taskId', jwtAuthMiddleware, cancelReadingHandler)
 
 // 同步解读（旧版，保留兼容）
 app.post('/api/reading', quotaMiddleware, rateLimitMiddleware, readingHandler)

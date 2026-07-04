@@ -233,7 +233,12 @@ export interface ReadingResult {
   lastGeminiStatus?: number
 }
 
-export async function callGeminiReading(apiKey: string, question: string | undefined, cards: any[]): Promise<ReadingResult> {
+export async function callGeminiReading(
+  apiKey: string,
+  question: string | undefined,
+  cards: any[],
+  signal?: AbortSignal,
+): Promise<ReadingResult> {
   const cardsInfo = cards
     .map(
       (c: any) =>
@@ -268,28 +273,41 @@ export async function callGeminiReading(apiKey: string, question: string | undef
   let fallbackReading: { reading: string; model: string; incomplete: boolean; truncated: boolean } | null = null
 
   for (const model of modelsToTry) {
-    const geminiResponse = await fetchWithProxy(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: systemPrompt }],
-          },
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: userPrompt }],
+    let geminiResponse: Response
+    try {
+      geminiResponse = await fetchWithProxy(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: systemPrompt }],
             },
-          ],
-          generationConfig: {
-            maxOutputTokens: 4096,
-            temperature: 0.8,
-          },
-        }),
-      },
-    )
+            contents: [
+              {
+                role: 'user',
+                parts: [{ text: userPrompt }],
+              },
+            ],
+            generationConfig: {
+              maxOutputTokens: 4096,
+              temperature: 0.8,
+            },
+          }),
+          signal,
+        },
+      )
+    } catch (err: any) {
+      // AbortError：任务被取消，不重试，直接向上传播
+      if (err.name === 'AbortError') throw err
+      // 其他网络错误：尝试下一个模型
+      log.warn({ model, err }, 'Gemini fetch failed, trying next model')
+      lastErrorStatus = 0
+      lastErrorText = err.message || 'Network error'
+      lastUsedModel = model
+      continue
+    }
 
     if (geminiResponse.ok) {
       const data: any = await geminiResponse.json()

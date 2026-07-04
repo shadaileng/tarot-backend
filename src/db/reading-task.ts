@@ -11,7 +11,7 @@ export interface ReadingTaskRow {
   cards_json: string
   reading: string | null
   model: string | null
-  status: 'pending' | 'completed' | 'failed'
+  status: 'pending' | 'completed' | 'failed' | 'cancelled'
   is_local: number
   incomplete: number
   warning: string | null
@@ -79,22 +79,55 @@ export async function completeReadingTask(params: {
   saveDb()
 }
 
-/** 标记任务失败 */
-export async function failReadingTask(taskId: string, error: string): Promise<void> {
+/** 标记任务失败（可指定 status 为 'failed' 或 'cancelled'） */
+export async function failReadingTask(
+  taskId: string,
+  error: string,
+  status: 'failed' | 'cancelled' = 'failed',
+): Promise<void> {
   const db = await getDb()
   const now = new Date().toISOString()
   db.run(
     `UPDATE readings
-     SET status = 'failed', error_msg = ?, updated_at = ?
+     SET status = ?, error_msg = ?, updated_at = ?
      WHERE id = ?`,
-    [error, now, taskId],
+    [status, error, now, taskId],
   )
   saveDb()
 }
 
+/**
+ * 取消解读任务（原子化）
+ * 仅当任务状态为 'pending' 时才更新为 'cancelled'
+ * @returns { ok: 是否成功取消, alreadyFinished: 任务是否已结束 }
+ */
+export async function cancelReadingTask(
+  taskId: string,
+  userId: string,
+): Promise<{ ok: boolean; alreadyFinished: boolean }> {
+  const db = await getDb()
+
+  // 原子化：只有 pending 才更新
+  db.run(
+    `UPDATE readings
+     SET status = 'cancelled', error_msg = 'Cancelled by user', updated_at = ?
+     WHERE id = ? AND user_id = ? AND status = 'pending'`,
+    [new Date().toISOString(), taskId, userId],
+  )
+
+  const changes = (db as any).getRowsModified?.() ?? 0
+  if (changes === 0) {
+    // 任务已结束（completed/failed/cancelled）
+    return { ok: false, alreadyFinished: true }
+  }
+
+  saveDb()
+  return { ok: true, alreadyFinished: false }
+}
+
 /** 获取任务统计 */
 export async function getAsyncTaskStats(): Promise<{
-  total: number; pending: number; completed: number; failed: number
+  total: number; pending: number; completed: number; failed: number; cancelled: number
 }> {
   const db = await getDb()
   const stmt = db.prepare(
@@ -102,7 +135,8 @@ export async function getAsyncTaskStats(): Promise<{
        COUNT(*) as total,
        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending,
        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
-       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
+       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+       SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled
      FROM readings`,
   )
   stmt.step()
@@ -113,5 +147,6 @@ export async function getAsyncTaskStats(): Promise<{
     pending: stats.pending || 0,
     completed: stats.completed || 0,
     failed: stats.failed || 0,
+    cancelled: stats.cancelled || 0,
   }
 }
