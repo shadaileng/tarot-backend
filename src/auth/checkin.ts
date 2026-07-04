@@ -4,6 +4,7 @@ import { getDb, saveDb } from '../db/index.js'
 import { getLogger } from '../logger.js'
 import { getUserStats, addPoints } from '../db/user-stats.js'
 import { advanceTaskProgress } from '../db/tasks.js'
+import { insertAuditLog } from '../db/audit.js'
 
 const log = getLogger('Auth:Checkin')
 
@@ -97,6 +98,18 @@ export async function checkinHandler(req: Request, res: Response): Promise<void>
     checkinStmt.free()
 
     log.info({ userId, streak, points: totalPoints }, 'Check-in completed')
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'user',
+      actorId: userId,
+      action: 'checkin',
+      targetType: 'user',
+      targetId: userId,
+      oldValue: { points: stats.points, consecutive_checkins: stats.consecutive_checkins },
+      newValue: { points: stats.points + totalPoints, consecutive_checkins: streak, points_earned: totalPoints, streak_bonus: streakBonus },
+      ipAddress: req.ip,
+    })
 
     res.json({
       success: true,

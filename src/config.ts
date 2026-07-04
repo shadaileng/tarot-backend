@@ -27,6 +27,7 @@ export const configMeta: ConfigMeta[] = [
   { key: 'PUPPETEER_PROTOCOL_TIMEOUT', envKey: 'PUPPETEER_PROTOCOL_TIMEOUT', group: '性能配置', editable: true, type: 'number', defaultValue: '60000' },
 
   { key: 'LOG_RETENTION_DAYS', envKey: 'LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '30' },
+  { key: 'AUDIT_LOG_RETENTION_DAYS', envKey: 'AUDIT_LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '0' },
 
   { key: 'WECHAT_APPID',  envKey: 'WECHAT_APPID',  group: '微信配置', editable: true, sensitive: false, type: 'string', defaultValue: '' },
   { key: 'WECHAT_SECRET', envKey: 'WECHAT_SECRET', group: '微信配置', editable: true, sensitive: true,  type: 'string', defaultValue: '' },
@@ -72,6 +73,10 @@ export const config = {
   db: {
     path: process.env.DB_PATH || './data/tarot.db',
     retentionDays: parseInt(process.env.LOG_RETENTION_DAYS || '30', 10),
+  },
+
+  auditLog: {
+    retentionDays: parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || '0', 10),  // 0 = 不自动清理
   },
 
   adminAccessExpiresIn: process.env.ADMIN_ACCESS_EXPIRES_IN || '2h',
@@ -133,6 +138,9 @@ export function updateConfig(key: string, value: string): void {
       break
     case 'LOG_RETENTION_DAYS':
       config.db.retentionDays = parseInt(value, 10)
+      break
+    case 'AUDIT_LOG_RETENTION_DAYS':
+      config.auditLog.retentionDays = parseInt(value, 10)
       break
     case 'PUPPETEER_PROTOCOL_TIMEOUT':
       config.puppeteer.protocolTimeout = parseInt(value, 10)

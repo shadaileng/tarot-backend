@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.23.0] - 2026-07-04
+
+### Added
+
+- 重建审计日志系统后端模块（`src/db/audit.ts`）：支持插入、分页查询、过期清理
+- 新增 `audit_logs` 数据库表及 4 个索引（created_at / actor / action / target）
+- 新增 `AUDIT_LOG_RETENTION_DAYS` 环境变量配置（默认 0 = 不自动清理）
+- 新增 `GET /api/admin/audit-logs` 审计日志查询接口（adminAuthMiddleware）
+- 新增 `POST /api/admin/audit-logs/clean` 审计日志手动清理接口
+- 新增自动清理定时器（每日执行，仅在 retentionDays > 0 时启动）
+- 用户操作审计埋点：签到、任务领取、额度消耗、登录/注册、邮箱/手机绑定、邀请码绑定
+- 管理员操作审计埋点：调整积分、重置额度、清除邀请、删除/恢复用户、配置变更、等级/任务定义更新、管理员 CRUD、重置密码、登录
+
 ## [2.22.1] - 2026-07-04
 
 ### Fixed

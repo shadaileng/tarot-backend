@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
 import bcrypt from 'bcrypt'
 import { findById, findByEmail, bindEmail, mergeAccount } from '../db/user.js'
+import { insertAuditLog } from '../db/audit.js'
 import { getLogger } from '../logger.js'
 import type { BindEmailRequest } from '../types/auth.js'
 
@@ -74,6 +75,18 @@ export async function bindEmailHandler(req: Request, res: Response): Promise<voi
     await bindEmail(userId, email, passwordHash)
 
     log.info({ userId, email }, 'Email bound to account')
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'user',
+      actorId: userId,
+      action: 'bind_email',
+      targetType: 'user',
+      targetId: userId,
+      oldValue: { email: currentUser.email || null },
+      newValue: { email },
+      ipAddress: req.ip,
+    })
 
     res.json({
       message: '邮箱绑定成功',

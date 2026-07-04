@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import { getLogger } from '../logger.js'
 import { updateInvitedBy } from '../db/user-stats.js'
 import { getReferralCode, getInviteRecords, getMyInviter, createPendingInvite } from '../db/invite.js'
+import { insertAuditLog } from '../db/audit.js'
 
 const log = getLogger('Auth:Invite')
 
@@ -75,6 +76,17 @@ export async function bindReferralHandler(req: Request, res: Response): Promise<
     }
 
     await createPendingInvite(userId)
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'user',
+      actorId: userId,
+      action: 'invite_bind',
+      targetType: 'user',
+      targetId: userId,
+      newValue: { referral_code: referralCode },
+      ipAddress: req.ip,
+    })
 
     log.info({ userId, referralCode }, 'Referral code bound')
     res.json({ success: true, message: '邀请码绑定成功' })

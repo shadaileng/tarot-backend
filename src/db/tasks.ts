@@ -1,7 +1,8 @@
 import { v4 as uuidv4 } from 'uuid'
 import { getDb, saveDb } from './index.js'
 import { getLogger } from '../logger.js'
-import { addPoints } from './user-stats.js'
+import { addPoints, getUserStats } from './user-stats.js'
+import { insertAuditLog } from './audit.js'
 
 const log = getLogger('DB:Tasks')
 
@@ -233,6 +234,28 @@ export async function claimTaskReward(userId: string, taskId: string): Promise<{
   }
 
   saveDb()
+
+  // 记录审计日志
+  const stats = await getUserStats(userId)
+  insertAuditLog({
+    actorType: 'user',
+    actorId: userId,
+    action: 'task_claim',
+    targetType: 'task',
+    targetId: taskId,
+    targetName: (row as any).title,
+    oldValue: {
+      points: stats?.points ?? 0,
+      extra_quota: stats?.extra_quota ?? 0,
+    },
+    newValue: {
+      points: (stats?.points ?? 0) + pointsReward,
+      extra_quota: (stats?.extra_quota ?? 0) + extraQuotaReward,
+      points_reward: pointsReward,
+      extra_quota_reward: extraQuotaReward,
+    },
+  })
+
   log.info({ userId, taskId, pointsReward, extraQuotaReward }, 'Task reward claimed')
 
   return { success: true, pointsReward, extraQuotaReward }

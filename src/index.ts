@@ -41,6 +41,7 @@ import { getInviteCodeHandler, getInviteRecordsHandler, bindReferralHandler } fr
 import { getUserStatsHandler, getLevelsHandler } from './auth/stats.js'
 import { initMissingUserStats } from './db/user-stats.js'
 import { getUserRecords, getRecordById, saveRecord, deleteRecord, updateRecordInterpretation } from './db/reading-record.js'
+import { insertAuditLog, queryAuditLogs, cleanExpiredAuditLogs } from './db/audit.js'
 import {
   findAdminByUsername, updateLastLogin, initAdminIfNeeded, findAdminById, changePassword,
   createAdmin, listAdmins, updateAdmin, deleteAdmin, resetAdminPassword, validatePasswordStrength,
@@ -338,6 +339,17 @@ app.post('/admin/auth/login', async (req, res) => {
 
     await updateLastLogin(admin.id)
 
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: admin.id,
+      actorName: admin.username,
+      action: 'admin_login',
+      targetType: 'admin',
+      targetId: admin.id,
+      ipAddress: ip,
+    })
+
     const secret = config.jwtSecret || 'dev-secret-do-not-use-in-production'
     const accessToken = jwt.sign(
       { sub: admin.id, username: admin.username, role: admin.role, type: 'admin', tokenType: 'access' },
@@ -532,6 +544,19 @@ app.post('/api/admin/admins', adminAuthMiddleware, async (req, res) => {
     })
     log.info({ adminId: admin.id, username, operator: (req as any).adminUsername }, 'Admin created')
 
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_create_admin',
+      targetType: 'admin',
+      targetId: admin.id,
+      targetName: username,
+      newValue: { username, displayName, role: newRole === 'readonly' ? 'readonly' : 'admin' },
+      ipAddress: req.ip,
+    })
+
     res.status(201).json({
       success: true,
       data: {
@@ -577,6 +602,19 @@ app.put('/api/admin/admins/:id', adminAuthMiddleware, async (req, res) => {
     await updateAdmin(targetId, updateData)
     log.info({ targetId, operator: (req as any).adminUsername, changes: updateData }, 'Admin updated')
 
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_update_admin',
+      targetType: 'admin',
+      targetId: targetId,
+      targetName: target.username,
+      newValue: updateData as Record<string, any>,
+      ipAddress: req.ip,
+    })
+
     res.json({ success: true, message: '管理员信息已更新' })
   } catch (err) {
     log.error({ err }, 'Failed to update admin')
@@ -605,6 +643,18 @@ app.delete('/api/admin/admins/:id', adminAuthMiddleware, async (req, res) => {
 
     await deleteAdmin(targetId)
     log.info({ targetId, operator: (req as any).adminUsername, targetUsername: target.username }, 'Admin deleted')
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_delete_admin',
+      targetType: 'admin',
+      targetId: targetId,
+      targetName: target.username,
+      ipAddress: req.ip,
+    })
 
     res.json({ success: true, message: '管理员已删除' })
   } catch (err) {
@@ -640,6 +690,18 @@ app.post('/api/admin/admins/:id/reset-password', adminAuthMiddleware, async (req
     const passwordHash = await bcrypt.hash(password, 10)
     await resetAdminPassword(targetId, passwordHash)
     log.info({ targetId, operator: (req as any).adminUsername, targetUsername: target.username }, 'Admin password reset')
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_reset_password',
+      targetType: 'admin',
+      targetId: targetId,
+      targetName: target.username,
+      ipAddress: req.ip,
+    })
 
     res.json({ success: true, message: '密码已重置，该管理员下次登录时需修改密码' })
   } catch (err) {
@@ -887,6 +949,19 @@ app.put('/api/admin/users/:id/unbind-email', adminAuthMiddleware, async (req, re
 app.delete('/api/admin/users/:id', adminAuthMiddleware, async (req, res) => {
   try {
     await softDeleteUser(req.params.id)
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_delete_user',
+      targetType: 'user',
+      targetId: req.params.id,
+      newValue: { deleted_at: new Date().toISOString() },
+      ipAddress: req.ip,
+    })
+
     res.json({ message: '用户已删除（可恢复）' })
   } catch (err) {
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '操作失败' })
@@ -897,6 +972,19 @@ app.delete('/api/admin/users/:id', adminAuthMiddleware, async (req, res) => {
 app.put('/api/admin/users/:id/restore', adminAuthMiddleware, async (req, res) => {
   try {
     await restoreUser(req.params.id)
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_restore_user',
+      targetType: 'user',
+      targetId: req.params.id,
+      newValue: { deleted_at: null },
+      ipAddress: req.ip,
+    })
+
     res.json({ message: '用户已恢复' })
   } catch (err) {
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '操作失败' })
@@ -939,6 +1027,19 @@ app.put('/api/admin/level-definitions/:level', adminAuthMiddleware, async (req, 
       [title, points_required, daily_quota, max_extra_quota ?? 100, level],
     )
     saveDb()
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_update_level',
+      targetType: 'level_definition',
+      targetId: String(level),
+      newValue: { title, points_required, daily_quota, max_extra_quota },
+      ipAddress: req.ip,
+    })
+
     res.json({ message: '等级配置已更新' })
   } catch (err) {
     log.error({ err }, 'Failed to update level definition')
@@ -980,6 +1081,20 @@ app.post('/api/admin/task-definitions', adminAuthMiddleware, async (req, res) =>
       [id, title, description || null, type, requirement_type, requirement_count, points_reward || 0, extra_quota_reward || 0, icon || null, sort_order || 0],
     )
     saveDb()
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_create_task',
+      targetType: 'task_definition',
+      targetId: id,
+      targetName: title,
+      newValue: { title, type, points_reward, extra_quota_reward },
+      ipAddress: req.ip,
+    })
+
     res.status(201).json({ message: '任务定义已创建' })
   } catch (err: any) {
     if (err.message?.includes('UNIQUE')) {
@@ -1018,6 +1133,19 @@ app.put('/api/admin/task-definitions/:id', adminAuthMiddleware, async (req, res)
     values.push(req.params.id)
     db.run(`UPDATE task_definitions SET ${updates.join(', ')} WHERE id = ?`, values)
     saveDb()
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_update_task',
+      targetType: 'task_definition',
+      targetId: req.params.id,
+      newValue: body as Record<string, any>,
+      ipAddress: req.ip,
+    })
+
     res.json({ message: '任务定义已更新' })
   } catch (err) {
     log.error({ err }, 'Failed to update task definition')
@@ -1078,13 +1206,28 @@ app.put('/api/admin/users/:id/points', adminAuthMiddleware, async (req, res) => 
     return
   }
   try {
-    const { addPoints } = await import('./db/user-stats.js')
+    const { addPoints, getUserStats } = await import('./db/user-stats.js')
     const { delta } = req.body as { delta: number }
     if (typeof delta !== 'number') {
       res.status(400).json({ error: 'INVALID_INPUT', message: 'delta 必须为数字' })
       return
     }
+    const oldStats = await getUserStats(req.params.id)
     const result = await addPoints(req.params.id, delta)
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_adjust_points',
+      targetType: 'user',
+      targetId: req.params.id,
+      oldValue: { points: oldStats?.points ?? 0 },
+      newValue: { points: result.newPoints, delta },
+      ipAddress: req.ip,
+    })
+
     res.json({ newPoints: result.newPoints, newLevel: result.newLevel, leveledUp: result.leveledUp })
   } catch (err) {
     log.error({ err }, 'Failed to adjust points')
@@ -1295,6 +1438,19 @@ app.put('/api/admin/users/:id/reset-quota', adminAuthMiddleware, async (req, res
     const db = await getDb()
     db.run('UPDATE user_stats SET daily_quota_used = 0 WHERE user_id = ?', [req.params.id])
     saveDb()
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_reset_quota',
+      targetType: 'user',
+      targetId: req.params.id,
+      newValue: { daily_quota_used: 0 },
+      ipAddress: req.ip,
+    })
+
     res.json({ message: '额度已重置' })
   } catch (err) {
     log.error({ err }, 'Failed to reset quota')
@@ -1309,6 +1465,19 @@ app.put('/api/admin/users/:id/clear-invite', adminAuthMiddleware, async (req, re
     db.run("DELETE FROM invite_records WHERE invitee_id = ?", [req.params.id])
     db.run("UPDATE user_stats SET invited_by = NULL WHERE user_id = ?", [req.params.id])
     saveDb()
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_clear_invite',
+      targetType: 'user',
+      targetId: req.params.id,
+      newValue: { invited_by: null },
+      ipAddress: req.ip,
+    })
+
     res.json({ message: '邀请绑定已清除' })
   } catch (err) {
     log.error({ err }, 'Failed to clear invite')
@@ -1527,6 +1696,19 @@ app.put('/api/config/:key', adminAuthMiddleware, async (req, res) => {
 
   log.info({ key, value: meta.sensitive ? '***' : stringValue }, 'Config updated')
 
+  // 记录审计日志
+  insertAuditLog({
+    actorType: 'admin',
+    actorId: (req as any).adminId,
+    actorName: (req as any).adminUsername,
+    action: 'admin_update_config',
+    targetType: 'system_config',
+    targetId: key,
+    targetName: key,
+    newValue: { value: meta.sensitive ? '***' : stringValue },
+    ipAddress: req.ip,
+  })
+
   res.json({ key, value: meta.sensitive ? maskSensitiveValue(key, stringValue) : stringValue, source: 'user' })
 })
 
@@ -1542,6 +1724,62 @@ app.get('/api/admin/feedback', adminAuthMiddleware, handleAdminListFeedback)
 app.get('/api/admin/feedback/:id', adminAuthMiddleware, handleAdminGetDetail)
 app.post('/api/admin/feedback/:id/reply', adminAuthMiddleware, handleAdminReply)
 app.put('/api/admin/feedback/:id/status', adminAuthMiddleware, handleAdminUpdateStatus)
+
+// ========== 审计日志 API（Admin JWT）==========
+
+app.get('/api/admin/audit-logs', adminAuthMiddleware, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1
+    const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
+    const actorType = req.query.actorType as string | undefined
+    const actorId = req.query.actorId as string | undefined
+    const action = req.query.action as string | undefined
+    const targetType = req.query.targetType as string | undefined
+    const startDate = req.query.startDate as string | undefined
+    const endDate = req.query.endDate as string | undefined
+
+    const result = await queryAuditLogs({
+      page, limit, actorType, actorId, action, targetType, startDate, endDate,
+    })
+    res.json(result)
+  } catch (err) {
+    log.error({ err }, 'Failed to query audit logs')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '查询审计日志失败' })
+  }
+})
+
+app.post('/api/admin/audit-logs/clean', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能执行此操作' })
+    return
+  }
+  try {
+    const { retentionDays } = req.body as { retentionDays?: number }
+    const days = retentionDays ?? config.auditLog.retentionDays
+
+    if (days <= 0) {
+      res.status(400).json({ error: 'INVALID_INPUT', message: '保留天数必须大于 0' })
+      return
+    }
+
+    const deleted = await cleanExpiredAuditLogs(days)
+
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_clean_audit_logs',
+      targetType: 'audit_log',
+      newValue: { retentionDays: days, deleted },
+      ipAddress: req.ip,
+    })
+
+    res.json({ message: `已清理 ${deleted} 条过期日志`, deleted, retentionDays: days })
+  } catch (err) {
+    log.error({ err }, 'Failed to clean audit logs')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '清理审计日志失败' })
+  }
+})
 
 // ========== 图片上传（JWT 鉴权）==========
 
@@ -1619,6 +1857,14 @@ async function start(): Promise<void> {
 
   // 恢复服务重启前的 pending 异步解读任务
   recoverPendingTasks().catch((e) => log.error({ err: e }, 'Failed to recover pending tasks'))
+
+  // 审计日志自动清理（仅在开启时启动）
+  if (config.auditLog.retentionDays > 0) {
+    cleanExpiredAuditLogs(config.auditLog.retentionDays).catch((e) => log.warn({ err: e }, 'Failed to clean audit logs on startup'))
+    setInterval(() => {
+      cleanExpiredAuditLogs(config.auditLog.retentionDays).catch((e) => log.warn({ err: e }, 'Failed to clean audit logs'))
+    }, 24 * 60 * 60 * 1000).unref()
+  }
 
   // 输出配置来源分组（from_env / from_default / from_user）
   {

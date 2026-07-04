@@ -2,6 +2,7 @@ import type { Request, Response } from 'express'
 import bcrypt from 'bcrypt'
 import { findByEmail, updateLastLogin, toUserInfo } from '../db/user.js'
 import { signJwt } from './wechat-login.js'
+import { insertAuditLog } from '../db/audit.js'
 import { getLogger } from '../logger.js'
 import type { EmailLoginRequest } from '../types/auth.js'
 
@@ -47,6 +48,16 @@ export async function emailLoginHandler(req: Request, res: Response): Promise<vo
 
     // 签发 JWT
     const token = signJwt(user.id, user.openid || '')
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'user',
+      actorId: user.id,
+      action: 'user_login',
+      targetType: 'user',
+      targetId: user.id,
+      ipAddress: req.ip,
+    })
 
     res.json({
       token,

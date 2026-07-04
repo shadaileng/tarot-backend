@@ -383,6 +383,29 @@ function initSchema(database: Database): void {
       UNIQUE(role, menu_id)
     )
   `)
+
+  // ========== 审计日志表 ==========
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id            TEXT PRIMARY KEY,
+      created_at    TEXT NOT NULL,
+      actor_type    TEXT NOT NULL,
+      actor_id      TEXT,
+      actor_name    TEXT,
+      action        TEXT NOT NULL,
+      target_type   TEXT,
+      target_id     TEXT,
+      target_name   TEXT,
+      old_value     TEXT,
+      new_value     TEXT,
+      ip_address    TEXT
+    )
+  `)
+  database.run('CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs(created_at DESC)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor_type, actor_id)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_audit_target ON audit_logs(target_type, target_id)')
 }
 
 /** 初始化 level_definitions 默认数据 */

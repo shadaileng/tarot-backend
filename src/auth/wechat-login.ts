@@ -5,6 +5,7 @@ import { getLogger } from '../logger.js'
 import { findByOpenid, findByUnionid, createUser, updateLastLogin, updateUnionid, toUserInfo } from '../db/user.js'
 import { createUserStats, findByReferralCode } from '../db/user-stats.js'
 import { initUserTasks } from '../db/tasks.js'
+import { insertAuditLog } from '../db/audit.js'
 import type { WechatLoginRequest, WechatSession } from '../types/auth.js'
 
 const log = getLogger('Auth:WechatLogin')
@@ -91,6 +92,16 @@ export async function wechatLoginHandler(req: Request, res: Response): Promise<v
 
     // 签发 JWT
     const token = signJwt(user.id, openid)
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'user',
+      actorId: user.id,
+      action: isNewUser ? 'user_register' : 'user_login',
+      targetType: 'user',
+      targetId: user.id,
+      ipAddress: req.ip,
+    })
 
     res.json({
       token,

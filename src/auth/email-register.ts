@@ -4,6 +4,7 @@ import { findByEmail, createUser, toUserInfo } from '../db/user.js'
 import { createUserStats, findByReferralCode } from '../db/user-stats.js'
 import { initUserTasks } from '../db/tasks.js'
 import { signJwt } from './wechat-login.js'
+import { insertAuditLog } from '../db/audit.js'
 import { getLogger } from '../logger.js'
 import type { EmailRegisterRequest } from '../types/auth.js'
 
@@ -64,6 +65,17 @@ export async function emailRegisterHandler(req: Request, res: Response): Promise
 
     // 签发 JWT
     const token = signJwt(user.id, user.openid || '')
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'user',
+      actorId: user.id,
+      action: 'user_register',
+      targetType: 'user',
+      targetId: user.id,
+      newValue: { email, nickname: user.nickname },
+      ipAddress: req.ip,
+    })
 
     res.status(201).json({
       token,

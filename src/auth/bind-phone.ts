@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express'
 import { config } from '../config.js'
 import { findById, bindPhone } from '../db/user.js'
+import { insertAuditLog } from '../db/audit.js'
 import { getLogger } from '../logger.js'
 import type { BindPhoneRequest } from '../types/auth.js'
 
@@ -47,6 +48,18 @@ export async function bindPhoneHandler(req: Request, res: Response): Promise<voi
     const masked = phone.slice(0, 3) + '****' + phone.slice(-4)
 
     log.info({ userId }, 'Phone bound')
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'user',
+      actorId: userId,
+      action: 'bind_phone',
+      targetType: 'user',
+      targetId: userId,
+      oldValue: { phone: currentUser.phone || null },
+      newValue: { phone: masked },
+      ipAddress: req.ip,
+    })
 
     res.json({
       message: '手机号绑定成功',
