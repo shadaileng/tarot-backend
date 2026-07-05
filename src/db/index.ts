@@ -223,6 +223,11 @@ function initSchema(database: Database): void {
     database.run('ALTER TABLE users ADD COLUMN deleted_at TEXT')
   } catch {}
 
+  // 兼容已有数据库：为 client_event_logs 新增 trace_id 列
+  try {
+    database.run('ALTER TABLE client_event_logs ADD COLUMN trace_id TEXT')
+  } catch {}
+
   // 更新邮箱唯一索引以支持软删除（排除已删除用户）
   try {
     database.run('DROP INDEX IF EXISTS idx_users_email')
@@ -424,12 +429,14 @@ function initSchema(database: Database): void {
       device_model   TEXT,
       system_version TEXT,
       sdk_version    TEXT,
-      app_version    TEXT
+      app_version    TEXT,
+      trace_id       TEXT
     )
   `)
   database.run('CREATE INDEX IF NOT EXISTS idx_client_event_user ON client_event_logs(user_id)')
   database.run('CREATE INDEX IF NOT EXISTS idx_client_event_created ON client_event_logs(created_at)')
   database.run('CREATE INDEX IF NOT EXISTS idx_client_event_category ON client_event_logs(category)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_client_event_trace ON client_event_logs(trace_id)')
 }
 
 /** 初始化 level_definitions 默认数据 */

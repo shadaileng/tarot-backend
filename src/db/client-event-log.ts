@@ -15,6 +15,7 @@ export interface ClientEventLogEntry {
   system_version: string | null
   sdk_version: string | null
   app_version: string | null
+  trace_id: string | null
 }
 
 /** 批量写入客户端事件（事务包裹） */
@@ -22,8 +23,8 @@ export async function insertClientEventLogs(events: ClientEventLogEntry[]): Prom
   const db = await getDb()
   const stmt = db.prepare(`
     INSERT OR IGNORE INTO client_event_logs
-    (id, user_id, created_at, event, category, level, result, action, data_json, platform, device_model, system_version, sdk_version, app_version)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (id, user_id, created_at, event, category, level, result, action, data_json, platform, device_model, system_version, sdk_version, app_version, trace_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   let inserted = 0
@@ -35,7 +36,7 @@ export async function insertClientEventLogs(events: ClientEventLogEntry[]): Prom
         e.result ?? null, e.action ?? null, e.data_json ?? null,
         e.platform ?? null, e.device_model ?? null,
         e.system_version ?? null, e.sdk_version ?? null,
-        e.app_version ?? null,
+        e.app_version ?? null, e.trace_id ?? null,
       ])
       stmt.step()
       stmt.reset()
@@ -56,7 +57,7 @@ export async function insertClientEventLogs(events: ClientEventLogEntry[]): Prom
 export async function queryClientEventLogs(opts: {
   page?: number; limit?: number
   userId?: string; category?: string; level?: string; event?: string
-  from?: string; to?: string
+  from?: string; to?: string; traceId?: string
 }) {
   const db = await getDb()
   const page = opts.page || 1
@@ -72,6 +73,7 @@ export async function queryClientEventLogs(opts: {
   if (opts.event) { where.push('event = ?'); params.push(opts.event) }
   if (opts.from) { where.push('created_at >= ?'); params.push(opts.from) }
   if (opts.to) { where.push('created_at <= ?'); params.push(opts.to) }
+  if (opts.traceId) { where.push('trace_id = ?'); params.push(opts.traceId) }
 
   const clause = where.length > 0 ? ' WHERE ' + where.join(' AND ') : ''
 

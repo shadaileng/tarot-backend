@@ -1947,6 +1947,7 @@ app.post('/api/client-events', jwtAuthMiddleware, async (req, res) => {
       system_version: e.device?.system ?? null,
       sdk_version: e.device?.sdkVersion ?? null,
       app_version: e.device?.appVersion ?? null,
+      trace_id: e.traceId ?? null,
     }))
 
     const { inserted } = await insertClientEventLogs(entries)
@@ -1969,6 +1970,7 @@ app.get('/api/admin/client-events', adminAuthMiddleware, async (req, res) => {
       event: req.query.event as string,
       from: req.query.from as string,
       to: req.query.to as string,
+      traceId: req.query.traceId as string,
     })
     res.json(result)
   } catch (err) {
