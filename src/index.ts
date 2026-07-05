@@ -1908,6 +1908,75 @@ app.post('/api/upload/feedback', jwtAuthMiddleware, (req: Request, res: Response
   })
 })
 
+// ========== 客户端事件日志 ==========
+
+import { insertClientEventLogs, queryClientEventLogs } from './db/client-event-log.js'
+
+app.post('/api/client-events', jwtAuthMiddleware, async (req, res) => {
+  try {
+    const { events } = req.body as { events: any[] }
+    if (!events || !Array.isArray(events) || events.length === 0) {
+      res.status(400).json({ error: 'INVALID_INPUT', message: 'events 数组不能为空' })
+      return
+    }
+    if (events.length > 50) {
+      res.status(400).json({ error: 'TOO_MANY', message: '单次最多上报 50 条事件' })
+      return
+    }
+    // 二次校验 body size（客户端已估算，此处兜底）
+    const bodySize = JSON.stringify(events).length
+    const MAX_BODY_SIZE = 64 * 1024  // 64KB
+    if (bodySize > MAX_BODY_SIZE) {
+      res.status(413).json({ error: 'PAYLOAD_TOO_LARGE', message: '请求体过大，请减少批次大小' })
+      return
+    }
+
+    const userId = req.userId!
+    const entries = events.map((e) => ({
+      id: e.id,
+      user_id: userId,
+      created_at: e.timestamp,
+      event: e.event,
+      category: e.category,
+      level: e.level || 'info',
+      result: e.result ?? null,
+      action: e.action ?? null,
+      data_json: e.data ? JSON.stringify(e.data) : null,
+      platform: e.device?.platform ?? null,
+      device_model: e.device?.model ?? null,
+      system_version: e.device?.system ?? null,
+      sdk_version: e.device?.sdkVersion ?? null,
+      app_version: e.device?.appVersion ?? null,
+    }))
+
+    const { inserted } = await insertClientEventLogs(entries)
+    log.info({ userId, count: events.length, inserted }, `Received ${events.length} client events, inserted ${inserted}`)
+    res.json({ received: events.length, inserted, duplicates: events.length - inserted })
+  } catch (err) {
+    log.error({ err }, 'Failed to insert client events')
+    res.status(500).json({ error: 'INTERNAL_ERROR' })
+  }
+})
+
+app.get('/api/admin/client-events', adminAuthMiddleware, async (req, res) => {
+  try {
+    const result = await queryClientEventLogs({
+      page: parseInt(req.query.page as string) || 1,
+      limit: parseInt(req.query.limit as string) || 50,
+      userId: req.query.userId as string,
+      category: req.query.category as string,
+      level: req.query.level as string,
+      event: req.query.event as string,
+      from: req.query.from as string,
+      to: req.query.to as string,
+    })
+    res.json(result)
+  } catch (err) {
+    log.error({ err }, 'Failed to query client events')
+    res.status(500).json({ error: 'INTERNAL_ERROR' })
+  }
+})
+
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   log.error({ err }, 'Unhandled error')
   res.status(500).json({ error: 'Internal server error' })
@@ -1941,6 +2010,15 @@ async function start(): Promise<void> {
     cleanExpiredAuditLogs(config.auditLog.retentionDays).catch((e) => log.warn({ err: e }, 'Failed to clean audit logs on startup'))
     setInterval(() => {
       cleanExpiredAuditLogs(config.auditLog.retentionDays).catch((e) => log.warn({ err: e }, 'Failed to clean audit logs'))
+    }, 24 * 60 * 60 * 1000).unref()
+  }
+
+  // 客户端事件日志自动清理（与 request_logs 共用 retentionDays）
+  {
+    const { cleanupClientEventLogs } = await import('./db/client-event-log.js')
+    cleanupClientEventLogs(config.db.retentionDays).catch((e) => log.warn({ err: e }, 'Failed to clean client event logs on startup'))
+    setInterval(() => {
+      cleanupClientEventLogs(config.db.retentionDays).catch((e) => log.warn({ err: e }, 'Failed to clean client event logs'))
     }, 24 * 60 * 60 * 1000).unref()
   }
 
