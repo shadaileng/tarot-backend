@@ -491,6 +491,19 @@ Admin JWT 保护，详见 `tarot-admin` 的 AGENTS.md。
 - 单值：`?action=admin_login`
 - 多值：`?action=admin_login,admin_create_admin`（逗号分隔）或 `?action=admin_login&action=admin_create_admin`（多 key）→ 后端解析为数组 → SQL `IN (...)` 精确匹配
 
+### 客户端事件日志（小程序埋点）
+
+| 操作 | 端点 | 说明 |
+|------|------|------|
+| 批量上报 | `POST /api/client-events` | JWT 鉴权，≤50 条/次，≤64KB/批，INSERT OR IGNORE 去重 |
+| 管理端查询 | `GET /api/admin/client-events` | 分页 + 多维筛选：`userId` / `category` / `level` / `event` / `from` / `to` |
+
+**事件分类**：`auth` / `reading` / `sync` / `poster` / `page` / `user_action` / `error`
+
+**数据模型**：`client_event_logs` 表，含 `id` / `user_id` / `created_at` / `event` / `category` / `level` / `result` / `action` / `data_json` / 设备信息字段
+
+**清理策略**：与 `request_logs` 共用 `retentionDays`，每日自动清理过期日志
+
 ### 账号生命周期
 
 ```

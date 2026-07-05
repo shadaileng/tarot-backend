@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.26.0] - 2026-07-05
+
+### Added
+
+- 新增客户端事件日志系统（`client_event_logs` 表 + `src/db/client-event-log.ts`）
+- 新增 `POST /api/client-events` 批量接收客户端事件接口（JWT 鉴权，含 body size 64KB 校验）
+- 新增 `GET /api/admin/client-events` 管理端查询接口（分页/多维筛选，不暴露 PII）
+- 新增客户端事件日志自动清理定时器（与 `request_logs` 共用 `retentionDays`）
+- 新增 `menu-client-events` 菜单项（系统监控分组下）
+
 ## [2.23.2] - 2026-07-04
 
 ### Fixed
