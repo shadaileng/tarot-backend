@@ -206,6 +206,32 @@ curl "http://localhost:3000/logs/<log-id>"
 
 ---
 
+### POST /api/client-events — 客户端事件上报
+
+JWT 鉴权，批量接收客户端埋点事件。单次 ≤50 条，body ≤64KB。
+
+请求体：
+
+```json
+{
+  "events": [{
+    "id": "uuid",
+    "timestamp": "2026-07-05T10:00:00.000Z",
+    "level": "info",
+    "category": "reading",
+    "event": "draw_cards",
+    "result": "success",
+    "traceId": "abc-123",
+    "data": { "spreadType": "three" },
+    "device": { "platform": "mp-weixin", "model": "iPhone" }
+  }]
+}
+```
+
+`traceId` 为可选字段，同一用户操作链路的所有事件共享此 ID，便于关联分析。
+
+---
+
 ### GET /health — 健康检查
 
 返回 Worker、Gemini API、缓存、浏览器池、请求指标的综合健康状态。

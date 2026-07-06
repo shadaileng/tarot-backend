@@ -496,11 +496,13 @@ Admin JWT 保护，详见 `tarot-admin` 的 AGENTS.md。
 | 操作 | 端点 | 说明 |
 |------|------|------|
 | 批量上报 | `POST /api/client-events` | JWT 鉴权，≤50 条/次，≤64KB/批，INSERT OR IGNORE 去重 |
-| 管理端查询 | `GET /api/admin/client-events` | 分页 + 多维筛选：`userId` / `category` / `level` / `event` / `from` / `to` |
+| 管理端查询 | `GET /api/admin/client-events` | 分页 + 多维筛选：`userId` / `category` / `level` / `event` / `from` / `to` / `traceId` |
 
 **事件分类**：`auth` / `reading` / `sync` / `poster` / `page` / `user_action` / `error`
 
-**数据模型**：`client_event_logs` 表，含 `id` / `user_id` / `created_at` / `event` / `category` / `level` / `result` / `action` / `data_json` / 设备信息字段
+**数据模型**：`client_event_logs` 表，含 `id` / `user_id` / `created_at` / `event` / `category` / `level` / `result` / `action` / `data_json` / `trace_id` / 设备信息字段
+
+**链路追踪**：客户端通过 `startTrace()`/`endTrace()` 为每次用户操作生成 `traceId`，同一操作链路的所有事件共享此 ID，便于关联分析和问题排查
 
 **清理策略**：与 `request_logs` 共用 `retentionDays`，每日自动清理过期日志
 

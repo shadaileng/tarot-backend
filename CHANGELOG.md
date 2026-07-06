@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.27.0] - 2026-07-05
+
+### Added
+
+- `client_event_logs` 表新增 `trace_id` 列 + 索引，支持操作链路追踪
+- `POST /api/client-events` 接收客户端 `traceId` 字段，写入 `trace_id` 列
+- `GET /api/admin/client-events` 新增 `traceId` 查询参数，支持按链路 ID 筛选
+
 ## [2.26.0] - 2026-07-05
 
 ### Added
