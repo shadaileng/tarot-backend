@@ -1,8 +1,14 @@
 import type { Request, Response } from 'express'
-import { updateProfile as updateUserProfile, toUserInfo } from '../db/user.js'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import { updateProfile as updateUserProfile, findById, toUserInfo } from '../db/user.js'
 import { insertAuditLog } from '../db/audit.js'
 import { getLogger } from '../logger.js'
 import type { UpdateProfileRequest } from '../types/auth.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 const log = getLogger('Auth:UpdateProfile')
 
@@ -48,6 +54,15 @@ export async function updateProfileHandler(req: Request, res: Response): Promise
       if (!/^\d{4}-\d{2}-\d{2}$/.test(birthday)) {
         res.status(400).json({ error: 'INVALID_BIRTHDAY', message: '生日格式无效（须为 YYYY-MM-DD）' })
         return
+      }
+    }
+
+    // 清理旧头像文件（仅清理本地上传的头像，不清理微信头像或 Base64）
+    if (avatarUrl !== undefined) {
+      const currentUser = await findById(userId)
+      if (currentUser?.avatar_url && currentUser.avatar_url.startsWith('/uploads/avatar/')) {
+        const oldPath = path.join(__dirname, '..', currentUser.avatar_url)
+        fs.unlink(oldPath, () => {}) // 异步删除，不阻塞
       }
     }
 

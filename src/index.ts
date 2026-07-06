@@ -1935,6 +1935,58 @@ app.post('/api/upload/feedback', jwtAuthMiddleware, (req: Request, res: Response
   })
 })
 
+// ========== 头像上传（JWT 鉴权）==========
+
+const avatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req: any, _file: any, cb: (err: Error | null, dest: string) => void) => {
+      const dir = path.join(__dirname, '../uploads/avatar')
+      fs.mkdirSync(dir, { recursive: true })
+      cb(null, dir)
+    },
+    filename: (_req: any, file: any, cb: (err: Error | null, name: string) => void) => {
+      const ext = path.extname(file.originalname) || '.png'
+      cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`)
+    },
+  }),
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  fileFilter: (_req: any, file: any, cb: any) => {
+    if (!file.mimetype.startsWith('image/')) {
+      cb(new Error('只允许上传图片'))
+      return
+    }
+    cb(null, true)
+  },
+})
+
+app.post('/api/upload/avatar', jwtAuthMiddleware, (req: Request, res: Response) => {
+  avatarUpload.single('avatar')(req, res, (err: any) => {
+    if (err) {
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+        res.status(400).json({ error: 'FILE_TOO_LARGE', message: '头像大小不能超过 2MB' })
+        return
+      }
+      res.status(400).json({ error: 'UPLOAD_ERROR', message: err.message || '上传失败' })
+      return
+    }
+    const file = (req as any).file
+    if (!file) {
+      res.status(400).json({ error: 'NO_FILE', message: '请选择图片' })
+      return
+    }
+    const url = `/uploads/avatar/${file.filename}`
+    insertAuditLog({
+      actorType: 'user',
+      actorId: req.userId!,
+      action: 'user_upload_avatar',
+      targetType: 'avatar',
+      newValue: { url },
+      ipAddress: req.ip,
+    })
+    res.json({ url })
+  })
+})
+
 // ========== 客户端事件日志 ==========
 
 import { insertClientEventLogs, queryClientEventLogs } from './db/client-event-log.js'
