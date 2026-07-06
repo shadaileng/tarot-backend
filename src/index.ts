@@ -1689,7 +1689,7 @@ app.get('/api/config', async (_req, res) => {
     }
     groups.get(meta.group)!.push({
       key: meta.envKey,
-      label: meta.envKey,
+      label: meta.description || meta.envKey,
       value,
       source: entry?.source ?? 'env',
       editable: meta.editable,
@@ -1698,6 +1698,33 @@ app.get('/api/config', async (_req, res) => {
   }
 
   res.json({ groups: Array.from(groups.entries()).map(([name, items]) => ({ name, items })) })
+})
+
+// ========== 小程序配置 API（公开，无需鉴权）==========
+
+/**
+ * GET /api/app-config
+ * 返回所有小程序端可用的远程配置，key 为短标识，value 已做类型转换
+ */
+app.get('/api/app-config', async (_req, res) => {
+  try {
+    const dbConfig = await getAllConfig()
+    const result: Record<string, number | string> = {}
+
+    for (const meta of configMeta) {
+      if (meta.group !== '小程序配置') continue
+
+      const entry = dbConfig.get(meta.envKey)
+      const rawValue = entry?.value ?? process.env[meta.envKey] ?? meta.defaultValue
+
+      result[meta.key] = meta.type === 'number' ? Number(rawValue) : rawValue
+    }
+
+    res.json(result)
+  } catch (err) {
+    log.error({ err }, 'Failed to get app config')
+    res.status(500).json({ error: 'INTERNAL_ERROR' })
+  }
 })
 
 app.put('/api/config/:key', adminAuthMiddleware, async (req, res) => {

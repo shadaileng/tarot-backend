@@ -6,6 +6,7 @@ export interface ConfigMeta {
   sensitive?: boolean
   type: 'string' | 'number'
   defaultValue: string
+  description?: string
 }
 
 export const configMeta: ConfigMeta[] = [
@@ -37,6 +38,25 @@ export const configMeta: ConfigMeta[] = [
   { key: 'ADMIN_REFRESH_EXPIRES_IN', envKey: 'ADMIN_REFRESH_EXPIRES_IN', group: '安全配置', editable: true, type: 'string', defaultValue: '30d' },
   { key: 'ADMIN_INIT_USERNAME',  envKey: 'ADMIN_INIT_USERNAME',  group: '安全配置', editable: false, sensitive: false, type: 'string', defaultValue: 'admin' },
   { key: 'ADMIN_INIT_PASSWORD',  envKey: 'ADMIN_INIT_PASSWORD',  group: '安全配置', editable: false, sensitive: true, type: 'string', defaultValue: 'admin@123456' },
+
+  // ========== 小程序配置 ==========
+  { key: 'REQUEST_DEFAULT_TIMEOUT',  envKey: 'MINIPROGRAM_REQUEST_DEFAULT_TIMEOUT',  group: '小程序配置', editable: true, type: 'number', defaultValue: '15000', description: '小程序默认请求超时（毫秒）' },
+  { key: 'READING_TIMEOUT',          envKey: 'MINIPROGRAM_READING_TIMEOUT',          group: '小程序配置', editable: true, type: 'number', defaultValue: '10000', description: 'AI解读接口超时（毫秒）' },
+  { key: 'HEALTH_CHECK_TIMEOUT',     envKey: 'MINIPROGRAM_HEALTH_CHECK_TIMEOUT',     group: '小程序配置', editable: true, type: 'number', defaultValue: '5000',  description: '健康检查超时（毫秒）' },
+  { key: 'POSTER_TIMEOUT',           envKey: 'MINIPROGRAM_POSTER_TIMEOUT',           group: '小程序配置', editable: true, type: 'number', defaultValue: '60000', description: '海报生成超时（毫秒）' },
+  { key: 'SYNC_TIMEOUT',             envKey: 'MINIPROGRAM_SYNC_TIMEOUT',             group: '小程序配置', editable: true, type: 'number', defaultValue: '10000', description: '记录同步超时（毫秒）' },
+  { key: 'QUESTION_MAX_LENGTH',      envKey: 'MINIPROGRAM_QUESTION_MAX_LENGTH',      group: '小程序配置', editable: true, type: 'number', defaultValue: '200',   description: '问题输入最大字数' },
+  { key: 'NICKNAME_MAX_LENGTH',      envKey: 'MINIPROGRAM_NICKNAME_MAX_LENGTH',      group: '小程序配置', editable: true, type: 'number', defaultValue: '30',    description: '昵称最大字数' },
+  { key: 'FEEDBACK_MAX_LENGTH',      envKey: 'MINIPROGRAM_FEEDBACK_MAX_LENGTH',      group: '小程序配置', editable: true, type: 'number', defaultValue: '500',   description: '反馈内容最大字数' },
+  { key: 'INVITE_CODE_LENGTH',       envKey: 'MINIPROGRAM_INVITE_CODE_LENGTH',       group: '小程序配置', editable: true, type: 'number', defaultValue: '6',     description: '邀请码长度' },
+  { key: 'MAX_LOCAL_RECORDS',        envKey: 'MINIPROGRAM_MAX_LOCAL_RECORDS',        group: '小程序配置', editable: true, type: 'number', defaultValue: '100',   description: '本地最大记录条数' },
+  { key: 'RECORD_PAGE_SIZE',         envKey: 'MINIPROGRAM_RECORD_PAGE_SIZE',         group: '小程序配置', editable: true, type: 'number', defaultValue: '100',   description: '云端记录分页大小' },
+  { key: 'TOAST_DURATION_DEFAULT',   envKey: 'MINIPROGRAM_TOAST_DURATION_DEFAULT',   group: '小程序配置', editable: true, type: 'number', defaultValue: '2000',  description: '默认Toast时长（毫秒）' },
+  { key: 'TOAST_DURATION_SHORT',     envKey: 'MINIPROGRAM_TOAST_DURATION_SHORT',     group: '小程序配置', editable: true, type: 'number', defaultValue: '1500',  description: '快捷Toast时长（毫秒）' },
+  { key: 'STARFIELD_PARTICLE_COUNT', envKey: 'MINIPROGRAM_STARFIELD_PARTICLE_COUNT', group: '小程序配置', editable: true, type: 'number', defaultValue: '40',    description: '首页星空粒子数量（0=关闭）' },
+  { key: 'CARD_FLIP_INTERVAL',       envKey: 'MINIPROGRAM_CARD_FLIP_INTERVAL',       group: '小程序配置', editable: true, type: 'number', defaultValue: '400',   description: '翻牌动画间隔（毫秒）' },
+  { key: 'KEYWORD_DISPLAY_LIMIT',    envKey: 'MINIPROGRAM_KEYWORD_DISPLAY_LIMIT',    group: '小程序配置', editable: true, type: 'number', defaultValue: '3',     description: '牌面关键词显示上限' },
+  { key: 'USE_ONLINE_READING_DEFAULT', envKey: 'MINIPROGRAM_USE_ONLINE_READING_DEFAULT', group: '小程序配置', editable: true, type: 'number', defaultValue: '1', description: '在线解读默认开启（1=是/0=否）' },
 ]
 
 export const config = {
