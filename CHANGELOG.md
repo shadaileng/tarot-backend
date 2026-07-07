@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 新增 `poster_tasks` 表（异步任务状态持久化）
 - 新增 `src/db/poster-task.ts`（海报任务 CRUD 操作）
 - 新增 `src/poster/async-handler.ts`（异步任务处理器，支持后台渲染、取消、重启恢复）
+- 新增用户删除脚本（`scripts/soft-delete-user.js`、`scripts/hard-delete-user.js`）
 
 ## [2.28.0] - 2026-07-06
 
