@@ -19,6 +19,7 @@ import { metrics } from './monitor/index.js'
 import { getLogger } from './logger.js'
 import { readingHandler } from './reading/handler.js'
 import { startReadingHandler, getReadingResultHandler, cancelReadingHandler, recoverPendingTasks, adminCancelTaskHandler } from './reading/async-handler.js'
+import { startPosterHandler, getPosterResultHandler, cancelPosterHandler } from './poster/async-handler.js'
 import { getCachedGeminiHealth, getGeminiHealthDirectly, quotaExhaustedCache } from './reading/models.js'
 import { queryRequestLogs, getRequestLogById, getRequestStats } from './db/request-log.js'
 import { queryReadingLogs, getReadingLogById } from './db/reading-log.js'
@@ -850,6 +851,11 @@ app.get('/api/poster/:cacheKey', async (req, res) => {
   res.set('Cache-Control', 'public, max-age=3600')
   res.send(cached)
 })
+
+// ========== 异步海报生成（新版，推荐）==========
+app.post('/api/poster/start', startPosterHandler)
+app.get('/api/poster/result/:taskId', getPosterResultHandler)
+app.post('/api/poster/cancel/:taskId', cancelPosterHandler)
 
 app.get('/api/logs', adminAuthMiddleware, async (req, res) => {
   const page = parseInt(req.query.page as string) || 1

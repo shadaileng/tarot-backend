@@ -174,6 +174,32 @@ function initSchema(database: Database): void {
   database.run('CREATE INDEX IF NOT EXISTS idx_readings_status ON readings(status)')
   database.run('CREATE INDEX IF NOT EXISTS idx_readings_request_log_id ON readings(request_log_id)')
 
+  // ========== 海报异步任务表 ==========
+
+  database.run(`
+    CREATE TABLE IF NOT EXISTS poster_tasks (
+      id              TEXT PRIMARY KEY,
+      user_id         TEXT,
+      created_at      TEXT NOT NULL,
+      updated_at      TEXT,
+      cards_json      TEXT NOT NULL,
+      question        TEXT,
+      spread_name     TEXT,
+      interpretation  TEXT,
+      comprehensive_interpretation TEXT,
+      theme           TEXT DEFAULT 'dark',
+      template        TEXT DEFAULT 'default',
+      status          TEXT NOT NULL DEFAULT 'pending',
+      poster_url      TEXT,
+      cache_key       TEXT,
+      error_msg       TEXT,
+      request_log_id  TEXT
+    )
+  `)
+  database.run('CREATE INDEX IF NOT EXISTS idx_poster_tasks_user_id ON poster_tasks(user_id)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_poster_tasks_status ON poster_tasks(status)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_poster_tasks_created_at ON poster_tasks(created_at DESC)')
+
   // ========== 管理员表 ==========
 
   database.run(`
