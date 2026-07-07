@@ -417,14 +417,17 @@ docker run -p 7860:7860 \
 
 **根本原因：** Cloudflare Worker 会用自己的 CORS 响应头**覆盖** HF Space 后端返回的 CORS 头。如果 Worker 代码中硬编码的 `Access-Control-Allow-Methods` 缺少 PUT 方法，即使后端正确设置了 PUT，浏览器仍会被拦截。
 
-**解决方案：** 在 Worker 代码中添加 PUT 到允许的方法列表：
+**解决方案：** 在 Worker 代码中确保 `Access-Control-Allow-Methods` 包含所有需要的方法：
 
 ```javascript
-// ❌ 错误：缺少 PUT
+// ❌ 错误：缺少 PUT/DELETE
 corsHeaders.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
 
-// ✅ 正确：包含 PUT
+// ⚠️ 部分修复：包含 PUT 但仍缺 DELETE
 corsHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
+
+// ✅ 正确：包含所有需要的方法
+corsHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
 ```
 
 **排查方法：** 使用 curl 测试 OPTIONS 预检请求，检查响应头：
@@ -432,11 +435,13 @@ corsHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
 ```bash
 curl -X OPTIONS \
   -H "Origin: https://your-admin-domain.com" \
-  -H "Access-Control-Request-Method: PUT" \
-  https://your-backend-domain.com/api/config/ANY_KEY -v
+  -H "Access-Control-Request-Method: DELETE" \
+  https://your-backend-domain.com/api/admin/users/TEST_ID -v
 ```
 
-检查 `Access-Control-Allow-Methods` 是否包含 PUT。
+检查 `Access-Control-Allow-Methods` 是否包含 DELETE。
+
+> **历史记录：** 2026-07-07 修复 DELETE 方法缺失问题（之前仅修复了 PUT）。
 
 ## 配置验证清单
 
