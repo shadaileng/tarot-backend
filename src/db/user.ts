@@ -103,7 +103,7 @@ export async function queryUsers(
       COUNT(l.id)   AS request_count,
       MAX(l.created_at) AS last_request_at
     FROM users u
-    LEFT JOIN reading_logs l ON u.id = l.user_id
+    LEFT JOIN request_logs l ON u.id = l.user_id
     ${whereClause}
     GROUP BY u.id
     ORDER BY ${orderBy}

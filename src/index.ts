@@ -1292,7 +1292,7 @@ app.get('/api/admin/stats/trends', adminAuthMiddleware, async (req, res) => {
     while (ckStmt.step()) { const r = ckStmt.getAsObject() as any; if (dateMap.has(r.date)) dateMap.get(r.date)!.checkin = r.count; else dateMap.set(r.date, { registration: 0, checkin: r.count, reading: 0, invite: 0 }) }
     ckStmt.free()
 
-    const rdStmt = db.prepare(`SELECT DATE(created_at) as date, COUNT(*) as count FROM reading_logs WHERE target = 'reading' AND created_at >= ? GROUP BY DATE(created_at)`)
+    const rdStmt = db.prepare(`SELECT DATE(created_at) as date, COUNT(*) as count FROM readings WHERE created_at >= ? GROUP BY DATE(created_at)`)
     rdStmt.bind([sinceStr])
     while (rdStmt.step()) { const r = rdStmt.getAsObject() as any; if (dateMap.has(r.date)) dateMap.get(r.date)!.reading = r.count; else dateMap.set(r.date, { registration: 0, checkin: 0, reading: r.count, invite: 0 }) }
     rdStmt.free()

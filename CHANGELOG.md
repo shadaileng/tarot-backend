@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.29.1] - 2026-07-07
+
+### Fixed
+
+- 修复 admin 解读日志页面无法查看7月1日后记录的问题：`/api/reading-logs` 改为查询 `readings` 新表
+- 修复 Dashboard 每日解读量统计7月1日后显示为0的问题：改为查询 `readings` 表
+- 修复用户管理列表请求次数/最后请求时间统计不准确的问题：JOIN 表从 `reading_logs` 改为 `request_logs`
+
 ## [2.29.0] - 2026-07-07
 
 ### Added

@@ -71,13 +71,13 @@ export function maskEmail(email: string | null): string | null {
 export async function queryReadingLogs(page: number = 1, limit: number = 50): Promise<ReadingLogQueryResult> {
   const db = await getDb()
 
-  const countSql = 'SELECT COUNT(*) as cnt FROM reading_logs'
-  const querySql = `SELECT l.id, l.created_at, l.user_id, l.question, l.cards_json, l.reading, l.model, l.incomplete,
+  const countSql = 'SELECT COUNT(*) as cnt FROM readings'
+  const querySql = `SELECT r.id, r.created_at, r.user_id, r.question, r.cards_json, r.reading, r.model, r.incomplete,
     u.nickname   AS user_nickname,
     u.email      AS user_email,
     u.avatar_url AS user_avatar
-  FROM reading_logs l
-  LEFT JOIN users u ON l.user_id = u.id`
+  FROM readings r
+  LEFT JOIN users u ON r.user_id = u.id`
 
   const countResult = db.exec(countSql)
   const total = countResult.length > 0 && countResult[0].values.length > 0
@@ -85,7 +85,7 @@ export async function queryReadingLogs(page: number = 1, limit: number = 50): Pr
     : 0
 
   const offset = (page - 1) * limit
-  const finalSql = querySql + ' ORDER BY l.created_at DESC LIMIT ? OFFSET ?'
+  const finalSql = querySql + ' ORDER BY r.created_at DESC LIMIT ? OFFSET ?'
 
   const stmt = db.prepare(finalSql)
   stmt.bind([limit, offset])
@@ -102,13 +102,13 @@ export async function queryReadingLogs(page: number = 1, limit: number = 50): Pr
 
 export async function getReadingLogById(id: string): Promise<ReadingLogEntry | undefined> {
   const db = await getDb()
-  const stmt = db.prepare(`SELECT l.id, l.created_at, l.user_id, l.question, l.cards_json, l.reading, l.model, l.incomplete,
+  const stmt = db.prepare(`SELECT r.id, r.created_at, r.user_id, r.question, r.cards_json, r.reading, r.model, r.incomplete,
     u.nickname   AS user_nickname,
     u.email      AS user_email,
     u.avatar_url AS user_avatar
-  FROM reading_logs l
-  LEFT JOIN users u ON l.user_id = u.id
-  WHERE l.id = ?`)
+  FROM readings r
+  LEFT JOIN users u ON r.user_id = u.id
+  WHERE r.id = ?`)
   stmt.bind([id])
   let row: ReadingLogEntry | undefined
   if (stmt.step()) {
