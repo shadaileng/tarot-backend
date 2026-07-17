@@ -282,6 +282,11 @@ function initSchema(database: Database): void {
     database.run('ALTER TABLE client_event_logs ADD COLUMN trace_id TEXT')
   } catch {}
 
+  // 兼容已有数据库：为 audit_logs 新增 hash 列（完整性链）
+  try {
+    database.run('ALTER TABLE audit_logs ADD COLUMN hash TEXT')
+  } catch {}
+
   // 更新邮箱唯一索引以支持软删除（排除已删除用户）
   try {
     database.run('DROP INDEX IF EXISTS idx_users_email')
@@ -645,6 +650,7 @@ export function initDefaultMenus(): void {
     ['menu-config',      'menu-system',    'config',          '配置',     'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', 6, null],
     ['menu-audit-logs',  'menu-system',    'audit-logs',      '操作日志',  'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', 7, null],
     ['menu-client-events','menu-system',  'client-events',   '客户端事件', 'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z', 8, null],
+    ['menu-persistence',  'menu-system',  'persistence',     '持久化监控', 'M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4', 9, null],
     // 用户管理
     ['menu-users',       'menu-user',      'users',           '用户管理',  'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', 1, null],
     ['menu-user-stats',  'menu-user',      'user-stats',      '用户统计',  'M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z', 2, null],
@@ -699,4 +705,228 @@ export function closeDb(): void {
     db.close()
     db = null
   }
+}
+
+// ========== 快照相关 ==========
+
+const LOG_TABLES = [
+  'request_logs', 'client_event_logs', 'audit_logs', 'reading_logs',
+  'readings', 'poster_tasks',
+]
+
+interface FileInfo {
+  path: string
+  sizeBytes: number
+  count: number
+}
+
+const MONITORED_FILES = [
+  'uploads/avatar',
+  'uploads/feedback',
+]
+
+function getDirSize(dirPath: string): { sizeBytes: number; count: number } {
+  let totalSize = 0
+  let count = 0
+  try {
+    if (!fs.existsSync(dirPath)) return { sizeBytes: 0, count: 0 }
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name)
+      if (entry.isFile()) {
+        totalSize += fs.statSync(fullPath).size
+        count++
+      }
+    }
+  } catch {}
+  return { sizeBytes: totalSize, count }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+}
+
+export interface TableStats {
+  name: string
+  rows: number
+  retentionDays: number
+}
+
+export interface FileStats {
+  path: string
+  sizeBytes: number
+  sizeHuman: string
+  count: number
+}
+
+export interface PersistenceStats {
+  database: {
+    path: string
+    sizeBytes: number
+    sizeHuman: string
+    pageSize: number
+    totalPages: number
+    freePages: number
+  }
+  tables: TableStats[]
+  files: {
+    database: FileStats
+    uploads: {
+      avatar: FileStats
+      feedback: FileStats
+    }
+  }
+  totalSizeBytes: number
+  totalSizeHuman: string
+  retention: {
+    logRetentionDays: number
+    auditLogRetentionDays: number
+  }
+}
+
+const TABLE_RETENTION: Record<string, string> = {
+  request_logs: 'db.retentionDays',
+  client_event_logs: 'db.retentionDays',
+  reading_logs: 'db.retentionDays',
+  audit_logs: 'auditLog.retentionDays',
+  readings: 'db.retentionDays',
+  poster_tasks: 'db.retentionDays',
+}
+
+function getRetentionDays(key: string): number {
+  switch (key) {
+    case 'db.retentionDays': return config.db.retentionDays
+    case 'auditLog.retentionDays': return config.auditLog.retentionDays
+    default: return 0
+  }
+}
+
+export function getDbStats(): PersistenceStats {
+  const database = db!
+
+  // 数据库文件信息
+  let dbSizeBytes = 0
+  try { dbSizeBytes = fs.statSync(config.db.path).size } catch {}
+  const pageSize = database.exec('PRAGMA page_size')[0]?.values[0]?.[0] as number || 4096
+  const pageCount = database.exec('PRAGMA page_count')[0]?.values[0]?.[0] as number || 0
+  const freePages = database.exec('PRAGMA freelist_count')[0]?.values[0]?.[0] as number || 0
+
+  // 各表行数
+  const tables: TableStats[] = ALL_TABLES.map(name => {
+    const countResult = database.exec(`SELECT COUNT(*) as cnt FROM ${name}`)
+    const rows = countResult.length > 0 && countResult[0].values.length > 0
+      ? Number(countResult[0].values[0][0])
+      : 0
+    const retentionKey = TABLE_RETENTION[name]
+    const retentionDays = retentionKey ? getRetentionDays(retentionKey) : 0
+
+    return { name, rows, retentionDays }
+  })
+
+  // 上传文件
+  const dbDir = path.dirname(config.db.path)
+  const projectRoot = path.resolve(dbDir, '..')
+  const avatarDir = path.join(projectRoot, 'uploads/avatar')
+  const feedbackDir = path.join(projectRoot, 'uploads/feedback')
+  const avatarStats = getDirSize(avatarDir)
+  const feedbackStats = getDirSize(feedbackDir)
+
+  const totalSizeBytes = dbSizeBytes + avatarStats.sizeBytes + feedbackStats.sizeBytes
+
+  return {
+    database: {
+      path: config.db.path,
+      sizeBytes: dbSizeBytes,
+      sizeHuman: formatBytes(dbSizeBytes),
+      pageSize,
+      totalPages: pageCount,
+      freePages,
+    },
+    tables,
+    files: {
+      database: { path: config.db.path, sizeBytes: dbSizeBytes, sizeHuman: formatBytes(dbSizeBytes), count: 1 },
+      uploads: {
+        avatar: { path: 'uploads/avatar', sizeBytes: avatarStats.sizeBytes, sizeHuman: formatBytes(avatarStats.sizeBytes), count: avatarStats.count },
+        feedback: { path: 'uploads/feedback', sizeBytes: feedbackStats.sizeBytes, sizeHuman: formatBytes(feedbackStats.sizeBytes), count: feedbackStats.count },
+      },
+    },
+    totalSizeBytes,
+    totalSizeHuman: formatBytes(totalSizeBytes),
+    retention: {
+      logRetentionDays: config.db.retentionDays,
+      auditLogRetentionDays: config.auditLog.retentionDays,
+    },
+  }
+}
+
+const ALL_TABLES = [
+  'request_logs', 'client_event_logs', 'audit_logs', 'reading_logs',
+  'readings', 'poster_tasks', 'checkin_records', 'reading_records',
+  'feedback', 'users', 'user_stats', 'admins', 'system_config',
+  'level_definitions', 'task_definitions', 'user_tasks', 'invite_records',
+  'menus', 'role_menus', 'page_section_visibility',
+]
+
+export async function snapshotDbSize(): Promise<void> {
+  const database = db!
+  if (!database) return
+
+  const dbPath = config.db.path
+
+  // DB 文件大小
+  let dbSizeBytes = 0
+  try { dbSizeBytes = fs.statSync(dbPath).size } catch {}
+
+  // DB 页面信息
+  const pageSize = database.exec('PRAGMA page_size')[0]?.values[0]?.[0] as number || 4096
+  const pageCount = database.exec('PRAGMA page_count')[0]?.values[0]?.[0] as number || 0
+  const freePages = database.exec('PRAGMA freelist_count')[0]?.values[0]?.[0] as number || 0
+
+  // 各表行数
+  const tableRows: Record<string, number> = {}
+  for (const name of LOG_TABLES) {
+    const result = database.exec(`SELECT COUNT(*) as cnt FROM ${name}`)
+    tableRows[name] = result.length > 0 && result[0].values.length > 0
+      ? Number(result[0].values[0][0])
+      : 0
+  }
+
+  // 持久化文件
+  const dbDir = path.dirname(dbPath)
+  const projectRoot = path.resolve(dbDir, '..')
+  const files: FileInfo[] = MONITORED_FILES.map(relPath => {
+    const fullPath = path.join(projectRoot, relPath)
+    const { sizeBytes, count } = getDirSize(fullPath)
+    return { path: relPath, sizeBytes, count }
+  })
+
+  // 写入快照表
+  try {
+    database.run(`
+      CREATE TABLE IF NOT EXISTS db_size_history (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        snapshot_at   TEXT NOT NULL,
+        db_size_bytes INTEGER NOT NULL,
+        total_pages   INTEGER NOT NULL,
+        free_pages    INTEGER NOT NULL,
+        table_rows    TEXT NOT NULL,
+        files         TEXT NOT NULL
+      )
+    `)
+    database.run('CREATE INDEX IF NOT EXISTS idx_db_size_history_snapshot ON db_size_history(snapshot_at DESC)')
+
+    database.run(
+      'INSERT INTO db_size_history (snapshot_at, db_size_bytes, total_pages, free_pages, table_rows, files) VALUES (?, ?, ?, ?, ?, ?)',
+      [
+        new Date().toISOString(),
+        dbSizeBytes,
+        pageCount,
+        freePages,
+        JSON.stringify(tableRows),
+        JSON.stringify(files),
+      ]
+    )
+    saveDb(true)
+  } catch {}
 }

@@ -28,7 +28,7 @@ export const configMeta: ConfigMeta[] = [
   { key: 'PUPPETEER_PROTOCOL_TIMEOUT', envKey: 'PUPPETEER_PROTOCOL_TIMEOUT', group: '性能配置', editable: true, type: 'number', defaultValue: '60000' },
 
   { key: 'LOG_RETENTION_DAYS', envKey: 'LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '30' },
-  { key: 'AUDIT_LOG_RETENTION_DAYS', envKey: 'AUDIT_LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '0' },
+  { key: 'AUDIT_LOG_RETENTION_DAYS', envKey: 'AUDIT_LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '90' },
 
   { key: 'WECHAT_APPID',  envKey: 'WECHAT_APPID',  group: '微信配置', editable: true, sensitive: false, type: 'string', defaultValue: '' },
   { key: 'WECHAT_SECRET', envKey: 'WECHAT_SECRET', group: '微信配置', editable: true, sensitive: true,  type: 'string', defaultValue: '' },

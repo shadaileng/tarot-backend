@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.31.0] - 2026-07-18
+
+### Added
+
+- 统一日志清理调度器（`src/db/cleanup.ts`），替代分散的 setInterval
+- `request_logs` 自动清理（`cleanupRequestLogs()`），默认保留 30 天
+- `poster_tasks` 旧数据清理（`cleanupPosterTasks()`），已完成/失败/取消的任务自动清理
+- `reading_logs` 遗留表清理（`deleteOldLogs()`）
+- 持久化指标 API（`GET /api/admin/persistence/stats`），展示数据库大小、各表行数、文件占用
+- 持久化历史 API（`GET /api/admin/persistence/history`），记录 DB 大小和各表行数趋势
+- 手动清理 API（`POST /api/admin/persistence/clean`），一键清理所有日志表
+- DB 大小快照表（`db_size_history`），每小时自动快照
+- Prometheus 持久化指标（`db_size_bytes`、`db_table_rows`、`cleanup_rows_deleted_total` 等）
+
+### Fixed
+
+- 修复 `AUDIT_LOG_RETENTION_DAYS` 默认值不一致（configMeta 为 '0'，config 为 90），统一为 90
+- 修复 `reading_logs.deleteOldLogs()` 硬编码 `return 0` 的 bug，改为返回实际删除行数
+
+### Changed
+
+- 移除 `index.ts` 中分散的审计日志和客户端事件日志清理 setInterval，改用统一调度器
+- `readings` 表不纳入自动清理，永久保留用户解读数据
+
 ## [2.30.0] - 2026-07-17
 
 ### Added

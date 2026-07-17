@@ -249,6 +249,45 @@ app.get('/api/metrics', async (_req, res) => {
     lines.push('')
   }
 
+  // 持久化指标
+  try {
+    const { getDbStats } = await import('./db/index.js')
+    const { getCleanupMetrics } = await import('./db/cleanup.js')
+    const dbStats = getDbStats()
+
+    lines.push('# HELP db_size_bytes Database file size in bytes')
+    lines.push('# TYPE db_size_bytes gauge')
+    lines.push(`db_size_bytes ${dbStats.database.sizeBytes}`)
+    lines.push('')
+
+    lines.push('# HELP db_table_rows Number of rows per table')
+    lines.push('# TYPE db_table_rows gauge')
+    for (const table of dbStats.tables) {
+      lines.push(`db_table_rows{table="${table.name}"} ${table.rows}`)
+    }
+    lines.push('')
+
+    lines.push('# HELP db_free_pages Free database pages')
+    lines.push('# TYPE db_free_pages gauge')
+    lines.push(`db_free_pages ${dbStats.database.freePages}`)
+    lines.push('')
+
+    lines.push('# HELP db_total_size_bytes Total size of all persisted data')
+    lines.push('# TYPE db_total_size_bytes gauge')
+    lines.push(`db_total_size_bytes ${dbStats.totalSizeBytes}`)
+    lines.push('')
+
+    const cleanupMetrics = getCleanupMetrics()
+    lines.push('# HELP cleanup_rows_deleted_total Rows deleted by cleanup scheduler')
+    lines.push('# TYPE cleanup_rows_deleted_total counter')
+    for (const [table, count] of Object.entries(cleanupMetrics)) {
+      lines.push(`cleanup_rows_deleted_total{table="${table}"} ${count}`)
+    }
+    lines.push('')
+  } catch {
+    // 非关键指标，加载失败不影响其他指标
+  }
+
   res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
   res.send(lines.join('\n'))
 })
@@ -2896,6 +2935,79 @@ app.get('/api/admin/client-events', adminAuthMiddleware, async (req, res) => {
   }
 })
 
+// ========== 持久化监控 API ==========
+
+app.get('/api/admin/persistence/stats', adminAuthMiddleware, async (req, res) => {
+  try {
+    const { getDbStats } = await import('./db/index.js')
+    const stats = getDbStats()
+    res.json(stats)
+  } catch (err) {
+    log.error({ err }, 'Failed to get persistence stats')
+    res.status(500).json({ error: 'INTERNAL_ERROR' })
+  }
+})
+
+app.get('/api/admin/persistence/history', adminAuthMiddleware, async (req, res) => {
+  try {
+    const db = await getDb()
+    const days = parseInt(req.query.days as string) || 7
+    const cutoff = new Date(Date.now() - days * 86400000).toISOString()
+
+    const stmt = db.prepare(
+      'SELECT * FROM db_size_history WHERE snapshot_at >= ? ORDER BY snapshot_at DESC'
+    )
+    stmt.bind([cutoff])
+    const rows: any[] = []
+    while (stmt.step()) {
+      rows.push(stmt.getAsObject())
+    }
+    stmt.free()
+
+    res.json({
+      snapshots: rows.map(r => ({
+        snapshotAt: r.snapshot_at,
+        dbSizeBytes: r.db_size_bytes,
+        totalPages: r.total_pages,
+        freePages: r.free_pages,
+        tableRows: JSON.parse(r.table_rows || '{}'),
+        files: JSON.parse(r.files || '[]'),
+      })),
+      days,
+    })
+  } catch (err) {
+    log.error({ err }, 'Failed to get persistence history')
+    res.status(500).json({ error: 'INTERNAL_ERROR' })
+  }
+})
+
+app.post('/api/admin/persistence/clean', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能执行此操作' })
+    return
+  }
+  try {
+    const { runAllCleanups } = await import('./db/cleanup.js')
+    const results = await runAllCleanups()
+
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_clean_all_logs',
+      targetType: 'system',
+      newValue: { results },
+      ipAddress: req.ip,
+    })
+
+    const total = results.reduce((sum, r) => sum + r.deleted, 0)
+    res.json({ message: `已清理 ${total} 条记录`, results, total })
+  } catch (err) {
+    log.error({ err }, 'Failed to run cleanup')
+    res.status(500).json({ error: 'INTERNAL_ERROR' })
+  }
+})
+
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   log.error({ err }, 'Unhandled error')
   res.status(500).json({ error: 'Internal server error' })
@@ -2924,22 +3036,9 @@ async function start(): Promise<void> {
   // 恢复服务重启前的 pending 异步解读任务
   recoverPendingTasks().catch((e) => log.error({ err: e }, 'Failed to recover pending tasks'))
 
-  // 审计日志自动清理（仅在开启时启动）
-  if (config.auditLog.retentionDays > 0) {
-    cleanExpiredAuditLogs(config.auditLog.retentionDays).catch((e) => log.warn({ err: e }, 'Failed to clean audit logs on startup'))
-    setInterval(() => {
-      cleanExpiredAuditLogs(config.auditLog.retentionDays).catch((e) => log.warn({ err: e }, 'Failed to clean audit logs'))
-    }, 24 * 60 * 60 * 1000).unref()
-  }
-
-  // 客户端事件日志自动清理（与 request_logs 共用 retentionDays）
-  {
-    const { cleanupClientEventLogs } = await import('./db/client-event-log.js')
-    cleanupClientEventLogs(config.db.retentionDays).catch((e) => log.warn({ err: e }, 'Failed to clean client event logs on startup'))
-    setInterval(() => {
-      cleanupClientEventLogs(config.db.retentionDays).catch((e) => log.warn({ err: e }, 'Failed to clean client event logs'))
-    }, 24 * 60 * 60 * 1000).unref()
-  }
+  // 统一日志清理调度器（替代分散的 setInterval）
+  const { scheduleCleanup } = await import('./db/cleanup.js')
+  scheduleCleanup()
 
   // 输出配置来源分组（from_env / from_default / from_user）
   {

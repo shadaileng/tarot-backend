@@ -138,3 +138,25 @@ export async function updatePosterTaskStatus(taskId: string, status: string): Pr
 
   saveDb()
 }
+
+/** 清理已完成/失败的旧海报任务 */
+export async function cleanupPosterTasks(retentionDays: number): Promise<number> {
+  if (retentionDays <= 0) return 0
+  const db = await getDb()
+  const cutoff = new Date(Date.now() - retentionDays * 86400000).toISOString()
+
+  const countStmt = db.prepare(
+    "SELECT COUNT(*) as cnt FROM poster_tasks WHERE created_at < ? AND status IN ('completed', 'failed', 'cancelled')"
+  )
+  countStmt.bind([cutoff])
+  countStmt.step()
+  const count = (countStmt.getAsObject() as { cnt: number }).cnt
+  countStmt.free()
+
+  if (count > 0) {
+    db.run("DELETE FROM poster_tasks WHERE created_at < ? AND status IN ('completed', 'failed', 'cancelled')", [cutoff])
+    saveDb(true)
+    log.info({ deleted: count, retentionDays }, 'Old poster tasks cleaned')
+  }
+  return count
+}

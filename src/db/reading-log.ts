@@ -276,9 +276,21 @@ export async function getLogById(id: string): Promise<LogEntry | undefined> {
 }
 
 export async function deleteOldLogs(retentionDays: number): Promise<number> {
+  if (retentionDays <= 0) return 0
   const db = await getDb()
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - retentionDays)
-  db.run('DELETE FROM reading_logs WHERE created_at < ?', [cutoff.toISOString()])
-  return 0
+  const cutoffStr = cutoff.toISOString()
+
+  const countStmt = db.prepare('SELECT COUNT(*) as cnt FROM reading_logs WHERE created_at < ?')
+  countStmt.bind([cutoffStr])
+  countStmt.step()
+  const count = (countStmt.getAsObject() as { cnt: number }).cnt
+  countStmt.free()
+
+  if (count > 0) {
+    db.run('DELETE FROM reading_logs WHERE created_at < ?', [cutoffStr])
+    saveDb(true)
+  }
+  return count
 }

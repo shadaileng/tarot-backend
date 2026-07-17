@@ -294,3 +294,18 @@ export async function getRequestStats(): Promise<RequestStats> {
     byTarget,
   }
 }
+
+export async function cleanupRequestLogs(retentionDays: number): Promise<number> {
+  if (retentionDays <= 0) return 0
+  const db = await getDb()
+  const cutoff = new Date(Date.now() - retentionDays * 86400000).toISOString()
+  const countResult = db.exec(`SELECT COUNT(*) as cnt FROM request_logs WHERE created_at < ?`, [cutoff])
+  const count = countResult.length > 0 && countResult[0].values.length > 0
+    ? Number(countResult[0].values[0][0])
+    : 0
+  if (count > 0) {
+    db.run('DELETE FROM request_logs WHERE created_at < ?', [cutoff])
+    saveDb(true)
+  }
+  return count
+}
