@@ -1635,6 +1635,22 @@ app.post('/api/admin/menus', adminAuthMiddleware, async (req, res) => {
       requireRole,
     })
 
+    // 自动关联角色菜单
+    const db = await getDb()
+    if (requireRole) {
+      // 有角色限制：只关联指定角色
+      db.run('INSERT OR IGNORE INTO role_menus (id, role, menu_id) VALUES (?, ?, ?)',
+        [`rm-${requireRole}-${menu.id}`, requireRole, menu.id])
+    } else {
+      // 无角色限制：关联所有已有角色
+      const rolesResult = db.exec('SELECT DISTINCT role FROM role_menus')
+      const allRoles = rolesResult[0]?.values.map(r => r[0] as string) || ['admin']
+      for (const role of allRoles) {
+        db.run('INSERT OR IGNORE INTO role_menus (id, role, menu_id) VALUES (?, ?, ?)',
+          [`rm-${role}-${menu.id}`, role, menu.id])
+      }
+    }
+
     saveDb()
 
     // 记录审计日志
@@ -1703,6 +1719,27 @@ app.put('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
       isVisible: isVisible !== undefined ? (isVisible ? 1 : 0) : undefined,
       requireRole,
     })
+
+    // 处理 require_role 变更时的角色关联同步
+    if (requireRole !== undefined && requireRole !== existing.require_role) {
+      const db = await getDb()
+      const menuId = req.params.id
+
+      if (requireRole) {
+        // 改为有角色限制：删除其他角色关联，只保留指定角色
+        db.run('DELETE FROM role_menus WHERE menu_id = ? AND role != ?', [menuId, requireRole])
+        db.run('INSERT OR IGNORE INTO role_menus (id, role, menu_id) VALUES (?, ?, ?)',
+          [`rm-${requireRole}-${menuId}`, requireRole, menuId])
+      } else {
+        // 改为无角色限制：关联所有角色
+        const rolesResult = db.exec('SELECT DISTINCT role FROM role_menus')
+        const allRoles = rolesResult[0]?.values.map(r => r[0] as string) || ['admin']
+        for (const role of allRoles) {
+          db.run('INSERT OR IGNORE INTO role_menus (id, role, menu_id) VALUES (?, ?, ?)',
+            [`rm-${role}-${menuId}`, role, menuId])
+        }
+      }
+    }
 
     saveDb()
 
