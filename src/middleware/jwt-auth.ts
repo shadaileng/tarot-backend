@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken'
 import { config } from '../config.js'
 import { getLogger } from '../logger.js'
 import { findById } from '../db/user.js'
+import { insertAuditLog } from '../db/audit.js'
 import type { JwtPayload } from '../types/auth.js'
 
 const log = getLogger('Middleware:JWT')
@@ -18,6 +19,14 @@ export async function jwtAuthMiddleware(req: Request, res: Response, next: NextF
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
 
   if (!token) {
+    insertAuditLog({
+      actorType: 'user',
+      actorId: null,
+      action: 'auth_failed',
+      targetType: 'user',
+      newValue: { reason: 'missing_token', endpoint: req.path },
+      ipAddress: req.ip,
+    })
     res.status(401).json({ error: 'UNAUTHORIZED', message: '缺少认证 token' })
     return
   }
@@ -28,6 +37,14 @@ export async function jwtAuthMiddleware(req: Request, res: Response, next: NextF
     const decoded = jwt.verify(token, secret) as JwtPayload
 
     if (!decoded.sub) {
+      insertAuditLog({
+        actorType: 'user',
+        actorId: null,
+        action: 'auth_failed',
+        targetType: 'user',
+        newValue: { reason: 'invalid_token', endpoint: req.path },
+        ipAddress: req.ip,
+      })
       res.status(401).json({ error: 'UNAUTHORIZED', message: '无效的 token' })
       return
     }
@@ -35,6 +52,15 @@ export async function jwtAuthMiddleware(req: Request, res: Response, next: NextF
     // 检查用户是否已被逻辑删除
     const user = await findById(decoded.sub)
     if (!user || user.deleted_at) {
+      insertAuditLog({
+        actorType: 'user',
+        actorId: decoded.sub,
+        action: 'auth_failed',
+        targetType: 'user',
+        targetId: decoded.sub,
+        newValue: { reason: 'account_deleted', endpoint: req.path },
+        ipAddress: req.ip,
+      })
       res.status(401).json({ error: 'ACCOUNT_DELETED', message: '账号已被注销' })
       return
     }
@@ -45,10 +71,26 @@ export async function jwtAuthMiddleware(req: Request, res: Response, next: NextF
     next()
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
+      insertAuditLog({
+        actorType: 'user',
+        actorId: null,
+        action: 'auth_failed',
+        targetType: 'user',
+        newValue: { reason: 'token_expired', endpoint: req.path },
+        ipAddress: req.ip,
+      })
       res.status(401).json({ error: 'TOKEN_EXPIRED', message: 'token 已过期，请重新登录' })
       return
     }
     if (err instanceof jwt.JsonWebTokenError) {
+      insertAuditLog({
+        actorType: 'user',
+        actorId: null,
+        action: 'auth_failed',
+        targetType: 'user',
+        newValue: { reason: 'invalid_token', endpoint: req.path },
+        ipAddress: req.ip,
+      })
       res.status(401).json({ error: 'UNAUTHORIZED', message: '无效的 token' })
       return
     }

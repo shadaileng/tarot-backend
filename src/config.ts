@@ -96,7 +96,7 @@ export const config = {
   },
 
   auditLog: {
-    retentionDays: parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || '0', 10),  // 0 = 不自动清理
+    retentionDays: parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || '90', 10),  // 默认90天
   },
 
   adminAccessExpiresIn: process.env.ADMIN_ACCESS_EXPIRES_IN || '2h',

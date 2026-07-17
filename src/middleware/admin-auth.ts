@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import { config } from '../config.js'
 import { getLogger } from '../logger.js'
+import { insertAuditLog } from '../db/audit.js'
 
 const log = getLogger('Middleware:AdminAuth')
 
@@ -29,6 +30,16 @@ export function adminAuthMiddleware(req: Request, res: Response, next: NextFunct
     const decoded = jwt.verify(token, secret) as AdminJwtPayload
 
     if (decoded.type !== 'admin') {
+      insertAuditLog({
+        actorType: 'admin',
+        actorId: decoded.sub,
+        actorName: decoded.username,
+        action: 'access_denied',
+        targetType: 'admin',
+        targetId: decoded.sub,
+        newValue: { reason: 'non_admin_token', endpoint: req.path },
+        ipAddress: req.ip,
+      })
       res.status(403).json({ error: 'FORBIDDEN', message: '非管理员 token' })
       return
     }

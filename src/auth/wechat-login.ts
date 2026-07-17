@@ -34,6 +34,16 @@ export async function wechatLoginHandler(req: Request, res: Response): Promise<v
     const session = await exchangeCodeForSession(code)
     if (!session.openid) {
       log.error({ errcode: session.errcode, errmsg: session.errmsg }, 'WeChat API error')
+      insertAuditLog({
+        actorType: 'user',
+        actorId: null,
+        actorName: null,
+        action: 'user_login_failed',
+        targetType: 'user',
+        targetId: null,
+        newValue: { reason: 'wechat_api_error', errcode: session.errcode, errmsg: session.errmsg },
+        ipAddress: req.ip,
+      })
       res.status(400).json({ error: 'WECHAT_ERROR', message: session.errmsg || '微信接口调用失败' })
       return
     }

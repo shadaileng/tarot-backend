@@ -189,6 +189,8 @@ POST /poster  { cards[], question, spreadName, ... }
 | PUT | `/api/admin/users/:id/restore` | 恢复已删除用户 | Admin JWT | ❌ |
 | GET | `/api/admin/audit-logs` | 审计日志分页查询 | Admin JWT | ❌ |
 | POST | `/api/admin/audit-logs/clean` | 手动清理过期审计日志 | Admin JWT | ❌ |
+| GET | `/api/admin/audit-logs/export` | 导出审计日志CSV | Admin JWT | ❌ |
+| GET | `/api/admin/audit-logs/anomalies` | 异常行为检测 | Admin JWT | ❌ |
 
 ### POST /reading
 
@@ -484,12 +486,20 @@ Admin JWT 保护，详见 `tarot-admin` 的 AGENTS.md。
 
 | 操作 | 端点 | 说明 |
 |------|------|------|
-| 审计日志列表 | `GET /api/admin/audit-logs` | 分页 + 多维筛选：`actorType` / `actorId` / `action`（支持数组）/ `targetType` / `dateRange` |
+| 审计日志列表 | `GET /api/admin/audit-logs` | 分页 + 多维筛选：`actorType` / `actorId` / `action`（支持数组）/ `targetType` / `dateRange` / `keyword` / `ipAddress` |
 | 手动清理 | `POST /api/admin/audit-logs/clean` | 按 `retentionDays` 清理过期日志 |
+| 导出CSV | `GET /api/admin/audit-logs/export` | 导出审计日志为CSV文件 |
+| 异常检测 | `GET /api/admin/audit-logs/anomalies` | 检测暴力破解、越权操作、token重放等异常行为 |
 
 **`action` 参数支持两种形式**：
 - 单值：`?action=admin_login`
 - 多值：`?action=admin_login,admin_create_admin`（逗号分隔）或 `?action=admin_login&action=admin_create_admin`（多 key）→ 后端解析为数组 → SQL `IN (...)` 精确匹配
+
+**新增审计日志类型**：
+- 登录失败：`admin_login_failed`、`user_login_failed`
+- 越权操作：`access_denied`
+- JWT鉴权失败：`auth_failed`
+- 管理员操作：`admin_logout`、`admin_token_refresh`
 
 ### 客户端事件日志（小程序埋点）
 

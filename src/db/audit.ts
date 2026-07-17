@@ -4,6 +4,8 @@ import { getLogger } from '../logger.js'
 
 const log = getLogger('DB:Audit')
 
+const MAX_VALUE_SIZE = 10 * 1024  // 10KB
+
 export interface AuditLogRow {
   id: string
   created_at: string
@@ -32,6 +34,15 @@ interface InsertAuditLogParams {
   ipAddress?: string | null
 }
 
+function truncateValue(value: any): string | null {
+  if (!value) return null
+  const json = JSON.stringify(value)
+  if (json.length > MAX_VALUE_SIZE) {
+    return json.substring(0, MAX_VALUE_SIZE) + '[TRUNCATED]'
+  }
+  return json
+}
+
 /**
  * 插入审计日志（fire-and-forget，不阻塞主流程）
  */
@@ -54,12 +65,12 @@ export async function insertAuditLog(params: InsertAuditLogParams): Promise<void
         params.targetType || null,
         params.targetId || null,
         params.targetName || null,
-        params.oldValue ? JSON.stringify(params.oldValue) : null,
-        params.newValue ? JSON.stringify(params.newValue) : null,
+        truncateValue(params.oldValue),
+        truncateValue(params.newValue),
         params.ipAddress || null,
       ],
     )
-    saveDb()
+    saveDb(true)  // 使用写合并，避免高频写入时的性能问题
   } catch (err) {
     log.error({ err, action: params.action, actorId: params.actorId }, 'Failed to insert audit log')
   }
@@ -75,6 +86,8 @@ interface QueryAuditLogsParams {
   targetId?: string
   startDate?: string
   endDate?: string
+  keyword?: string
+  ipAddress?: string
 }
 
 /**
@@ -125,6 +138,14 @@ export async function queryAuditLogs(params: QueryAuditLogsParams): Promise<{
   if (params.endDate) {
     where.push('created_at <= ?')
     bindParams.push(params.endDate + 'T23:59:59.999Z')
+  }
+  if (params.keyword) {
+    where.push('(actor_name LIKE ? OR target_name LIKE ?)')
+    bindParams.push(`%${params.keyword}%`, `%${params.keyword}%`)
+  }
+  if (params.ipAddress) {
+    where.push('ip_address LIKE ?')
+    bindParams.push(`%${params.ipAddress}%`)
   }
 
   const whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : ''

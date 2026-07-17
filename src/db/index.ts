@@ -10,6 +10,10 @@ const log = getLogger('DB')
 let db: Database | null = null
 let SQL: SqlJsStatic | null = null
 
+// 写合并机制
+let saveDbTimeout: NodeJS.Timeout | null = null
+let pendingSave = false
+
 async function initSql(): Promise<SqlJsStatic> {
   if (!SQL) {
     SQL = await initSqlJs()
@@ -17,13 +21,37 @@ async function initSql(): Promise<SqlJsStatic> {
   return SQL
 }
 
-export function saveDb(): void {
-  const data = db!.export()
-  const dir = path.dirname(config.db.path)
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true })
+function doSaveDb(): void {
+  try {
+    const data = db!.export()
+    const dir = path.dirname(config.db.path)
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true })
+    }
+    fs.writeFileSync(config.db.path, Buffer.from(data))
+  } catch (err) {
+    log.error({ err }, 'saveDb failed')
   }
-  fs.writeFileSync(config.db.path, Buffer.from(data))
+}
+
+export function saveDb(debounce = false): void {
+  if (!debounce) {
+    // 立即执行（用于关键操作如初始化）
+    doSaveDb()
+    return
+  }
+
+  // 写合并：50ms内的多次调用合并为一次
+  pendingSave = true
+  if (saveDbTimeout) {
+    clearTimeout(saveDbTimeout)
+  }
+  saveDbTimeout = setTimeout(() => {
+    if (pendingSave) {
+      doSaveDb()
+      pendingSave = false
+    }
+  }, 50)
 }
 
 export async function getDb(): Promise<Database> {
@@ -464,6 +492,10 @@ function initSchema(database: Database): void {
   database.run('CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_logs(actor_type, actor_id)')
   database.run('CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action)')
   database.run('CREATE INDEX IF NOT EXISTS idx_audit_target ON audit_logs(target_type, target_id)')
+  // 复合索引：优化多条件组合查询
+  database.run('CREATE INDEX IF NOT EXISTS idx_audit_action_created ON audit_logs(action, created_at DESC)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_audit_actor_created ON audit_logs(actor_type, actor_id, created_at DESC)')
+  database.run('CREATE INDEX IF NOT EXISTS idx_audit_target_created ON audit_logs(target_type, target_id, created_at DESC)')
 
   // ========== 客户端事件日志表 ==========
 
@@ -652,8 +684,17 @@ export function initDefaultMenus(): void {
 }
 
 export function closeDb(): void {
+  // 清除定时器并立即保存
+  if (saveDbTimeout) {
+    clearTimeout(saveDbTimeout)
+    saveDbTimeout = null
+  }
+  if (pendingSave) {
+    doSaveDb()
+    pendingSave = false
+  }
   if (db) {
-    saveDb()
+    doSaveDb()
     db.close()
     db = null
   }

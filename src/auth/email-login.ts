@@ -24,6 +24,15 @@ export async function emailLoginHandler(req: Request, res: Response): Promise<vo
     // 查找用户
     const user = await findByEmail(email)
     if (!user || !user.password_hash) {
+      insertAuditLog({
+        actorType: 'user',
+        actorId: null,
+        actorName: email,
+        action: 'user_login_failed',
+        targetType: 'user',
+        targetId: null,
+        ipAddress: req.ip,
+      })
       res.status(401).json({ error: 'INVALID_CREDENTIALS', message: '邮箱或密码错误' })
       return
     }
@@ -31,6 +40,15 @@ export async function emailLoginHandler(req: Request, res: Response): Promise<vo
     // 验证密码
     const valid = await bcrypt.compare(password, user.password_hash)
     if (!valid) {
+      insertAuditLog({
+        actorType: 'user',
+        actorId: user.id,
+        actorName: email,
+        action: 'user_login_failed',
+        targetType: 'user',
+        targetId: user.id,
+        ipAddress: req.ip,
+      })
       res.status(401).json({ error: 'INVALID_CREDENTIALS', message: '邮箱或密码错误' })
       return
     }

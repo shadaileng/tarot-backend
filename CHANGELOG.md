@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.30.0] - 2026-07-17
+
+### Added
+
+- 新增登录失败审计日志（`admin_login_failed`、`user_login_failed`）
+- 新增越权操作审计日志（`access_denied`）
+- 新增JWT鉴权失败审计日志（`auth_failed`）
+- 新增admin登出/token刷新审计日志（`admin_logout`、`admin_token_refresh`）
+- 新增审计日志CSV导出功能（`GET /api/admin/audit-logs/export`）
+- 新增异常行为检测API（`GET /api/admin/audit-logs/anomalies`）
+- 新增关键词/IP搜索功能（`keyword`、`ipAddress`查询参数）
+
+### Changed
+
+- saveDb()写合并性能优化，减少高频写入时的I/O竞争
+- 添加复合索引优化多条件查询性能
+- old_value/new_value大小限制（10KB），防止大型对象撑爆存储
+- 审计日志默认保留天数从0改为90天
+
 ## [2.29.1] - 2026-07-07
 
 ### Fixed

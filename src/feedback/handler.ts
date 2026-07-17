@@ -94,6 +94,15 @@ export async function handleGetFeedbackDetail(req: Request, res: Response): Prom
     }
 
     if (feedback.user_id !== req.userId) {
+      insertAuditLog({
+        actorType: 'user',
+        actorId: req.userId,
+        action: 'access_denied',
+        targetType: 'feedback',
+        targetId: req.params.id,
+        newValue: { reason: 'not_owner', endpoint: req.path },
+        ipAddress: req.ip,
+      })
       res.status(403).json({ error: 'FORBIDDEN', message: '无权查看此反馈' })
       return
     }
@@ -178,6 +187,16 @@ export async function handleAdminGetDetail(req: Request, res: Response): Promise
 
 export async function handleAdminReply(req: Request, res: Response): Promise<void> {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'feedback',
+      targetId: req.params.id,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能回复' })
     return
   }
@@ -216,6 +235,16 @@ export async function handleAdminReply(req: Request, res: Response): Promise<voi
 
 export async function handleAdminUpdateStatus(req: Request, res: Response): Promise<void> {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'feedback',
+      targetId: req.params.id,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
     return
   }

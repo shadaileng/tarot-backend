@@ -339,12 +339,30 @@ app.post('/admin/auth/login', async (req, res) => {
     const admin = await findAdminByUsername(username)
 
     if (!admin || admin.is_active !== 1) {
+      insertAuditLog({
+        actorType: 'admin',
+        actorId: null,
+        actorName: username,
+        action: 'admin_login_failed',
+        targetType: 'admin',
+        targetId: null,
+        ipAddress: ip,
+      })
       res.status(401).json({ error: 'INVALID_CREDENTIALS', message: '用户名或密码错误' })
       return
     }
 
     const passwordMatch = await bcrypt.compare(password, admin.password_hash)
     if (!passwordMatch) {
+      insertAuditLog({
+        actorType: 'admin',
+        actorId: admin.id,
+        actorName: admin.username,
+        action: 'admin_login_failed',
+        targetType: 'admin',
+        targetId: admin.id,
+        ipAddress: ip,
+      })
       res.status(401).json({ error: 'INVALID_CREDENTIALS', message: '用户名或密码错误' })
       return
     }
@@ -392,7 +410,16 @@ app.post('/admin/auth/login', async (req, res) => {
 })
 
 // Admin 登出（纯前端清除 token，后端无状态）
-app.post('/admin/auth/logout', adminAuthMiddleware, (_req, res) => {
+app.post('/admin/auth/logout', adminAuthMiddleware, (req, res) => {
+  insertAuditLog({
+    actorType: 'admin',
+    actorId: (req as any).adminId,
+    actorName: (req as any).adminUsername,
+    action: 'admin_logout',
+    targetType: 'admin',
+    targetId: (req as any).adminId,
+    ipAddress: (req as any).ip || req.ip,
+  })
   res.json({ message: '已退出登录' })
 })
 
@@ -431,6 +458,16 @@ app.post('/admin/auth/refresh', async (req, res) => {
       secret,
       { expiresIn: (config.adminRefreshExpiresIn || '30d') as import('ms').StringValue },
     )
+
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: admin.id,
+      actorName: admin.username,
+      action: 'admin_token_refresh',
+      targetType: 'admin',
+      targetId: admin.id,
+      ipAddress: req.ip,
+    })
 
     res.json({ accessToken: newAccessToken, refreshToken: newRefreshToken })
   } catch (err) {
@@ -508,6 +545,16 @@ app.post('/admin/auth/change-password', adminAuthMiddleware, async (req, res) =>
 function requireAdminRole(req: Request, res: Response): boolean {
   const role = (req as any).adminRole as string | undefined
   if (role !== 'admin') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'admin',
+      targetId: (req as any).adminId,
+      newValue: { reason: 'non_super_admin_action', requiredRole: 'admin', actualRole: role },
+      ipAddress: (req as any).ip || req.ip,
+    })
     res.status(403).json({ error: 'FORBIDDEN', message: '仅超级管理员可执行此操作' })
     return false
   }
@@ -1046,6 +1093,16 @@ app.get('/api/admin/level-definitions', adminAuthMiddleware, async (_req, res) =
 
 app.put('/api/admin/level-definitions/:level', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'level_definition',
+      targetId: req.params.level,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改配置' })
     return
   }
@@ -1100,6 +1157,16 @@ app.get('/api/admin/task-definitions', adminAuthMiddleware, async (_req, res) =>
 
 app.post('/api/admin/task-definitions', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'task_definition',
+      targetId: (req.body as any)?.id,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改配置' })
     return
   }
@@ -1145,6 +1212,16 @@ app.post('/api/admin/task-definitions', adminAuthMiddleware, async (req, res) =>
 
 app.put('/api/admin/task-definitions/:id', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'task_definition',
+      targetId: req.params.id,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改配置' })
     return
   }
@@ -1239,6 +1316,16 @@ app.get('/api/admin/user-stats', adminAuthMiddleware, async (req, res) => {
 
 app.put('/api/admin/users/:id/points', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'user',
+      targetId: req.params.id,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改配置' })
     return
   }
@@ -1393,7 +1480,19 @@ app.get('/api/admin/invite-records', adminAuthMiddleware, async (req, res) => {
 })
 
 app.put('/api/admin/invite-records/:id/complete', adminAuthMiddleware, async (req, res) => {
-  if ((req as any).adminRole === 'readonly') return res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
+  if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'invite_record',
+      targetId: req.params.id,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
+    return res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
+  }
   try {
     const db = await getDb()
     const now = new Date().toISOString()
@@ -1420,7 +1519,19 @@ app.put('/api/admin/invite-records/:id/complete', adminAuthMiddleware, async (re
 })
 
 app.delete('/api/admin/invite-records/:id', adminAuthMiddleware, async (req, res) => {
-  if ((req as any).adminRole === 'readonly') return res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
+  if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'invite_record',
+      targetId: req.params.id,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
+    return res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
+  }
   try {
     const db = await getDb()
     db.run('DELETE FROM invite_records WHERE id = ?', [req.params.id])
@@ -1490,7 +1601,19 @@ app.get('/api/admin/checkin-stats', adminAuthMiddleware, async (req, res) => {
 })
 
 app.put('/api/admin/users/:id/reset-quota', adminAuthMiddleware, async (req, res) => {
-  if ((req as any).adminRole === 'readonly') return res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
+  if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'user',
+      targetId: req.params.id,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
+    return res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
+  }
   try {
     const db = await getDb()
     db.run('UPDATE user_stats SET daily_quota_used = 0 WHERE user_id = ?', [req.params.id])
@@ -1516,7 +1639,19 @@ app.put('/api/admin/users/:id/reset-quota', adminAuthMiddleware, async (req, res
 })
 
 app.put('/api/admin/users/:id/clear-invite', adminAuthMiddleware, async (req, res) => {
-  if ((req as any).adminRole === 'readonly') return res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
+  if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'user',
+      targetId: req.params.id,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
+    return res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改' })
+  }
   try {
     const db = await getDb()
     db.run("DELETE FROM invite_records WHERE invitee_id = ?", [req.params.id])
@@ -1608,6 +1743,16 @@ app.get('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
 // 创建菜单
 app.post('/api/admin/menus', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'menu',
+      targetId: null,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     log.warn({
       operator: (req as any).adminUsername,
       role: (req as any).adminRole,
@@ -1725,6 +1870,16 @@ app.post('/api/admin/menus', adminAuthMiddleware, async (req, res) => {
 // 更新菜单
 app.put('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'menu',
+      targetId: req.params.id,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     log.warn({
       operator: (req as any).adminUsername,
       role: (req as any).adminRole,
@@ -1843,6 +1998,16 @@ app.put('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
 // 删除菜单
 app.delete('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'menu',
+      targetId: req.params.id,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     log.warn({
       operator: (req as any).adminUsername,
       role: (req as any).adminRole,
@@ -1899,6 +2064,16 @@ app.delete('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
 // 批量更新菜单排序
 app.put('/api/admin/menus/sort', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'menu',
+      targetId: null,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改菜单排序' })
     return
   }
@@ -1966,6 +2141,16 @@ app.get('/api/admin/menus/role/:role', adminAuthMiddleware, async (req, res) => 
 // 设置角色菜单
 app.put('/api/admin/menus/role/:role', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'menu',
+      targetId: req.params.role,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     log.warn({
       operator: (req as any).adminUsername,
       role: (req as any).adminRole,
@@ -2048,6 +2233,16 @@ app.get('/api/admin/page-sections', adminAuthMiddleware, async (_req, res) => {
 
 app.put('/api/admin/page-sections/:id', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'page_section',
+      targetId: req.params.id,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改配置' })
     return
   }
@@ -2220,6 +2415,16 @@ app.put('/api/config/:key', adminAuthMiddleware, async (req, res) => {
 
   // 只读管理员不允许修改配置
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'config',
+      targetId: key,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改配置' })
     return
   }
@@ -2320,9 +2525,11 @@ app.get('/api/admin/audit-logs', adminAuthMiddleware, async (req, res) => {
     const targetType = req.query.targetType as string | undefined
     const startDate = req.query.startDate as string | undefined
     const endDate = req.query.endDate as string | undefined
+    const keyword = req.query.keyword as string | undefined
+    const ipAddress = req.query.ipAddress as string | undefined
 
     const result = await queryAuditLogs({
-      page, limit, actorType, actorId, action, targetType, startDate, endDate,
+      page, limit, actorType, actorId, action, targetType, startDate, endDate, keyword, ipAddress,
     })
     res.json(result)
   } catch (err) {
@@ -2333,6 +2540,16 @@ app.get('/api/admin/audit-logs', adminAuthMiddleware, async (req, res) => {
 
 app.post('/api/admin/audit-logs/clean', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'audit_log',
+      targetId: null,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能执行此操作' })
     return
   }
@@ -2361,6 +2578,140 @@ app.post('/api/admin/audit-logs/clean', adminAuthMiddleware, async (req, res) =>
   } catch (err) {
     log.error({ err }, 'Failed to clean audit logs')
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '清理审计日志失败' })
+  }
+})
+
+// 导出审计日志
+app.get('/api/admin/audit-logs/export', adminAuthMiddleware, async (req, res) => {
+  try {
+    const actorType = req.query.actorType as string | undefined
+    const actorId = req.query.actorId as string | undefined
+    const rawAction = req.query.action
+    let action: string | string[] | undefined
+    if (Array.isArray(rawAction)) {
+      action = rawAction as string[]
+    } else if (typeof rawAction === 'string' && rawAction.includes(',')) {
+      action = rawAction.split(',').map(s => s.trim()).filter(Boolean)
+    } else if (typeof rawAction === 'string') {
+      action = rawAction
+    }
+    const targetType = req.query.targetType as string | undefined
+    const startDate = req.query.startDate as string | undefined
+    const endDate = req.query.endDate as string | undefined
+
+    const result = await queryAuditLogs({
+      page: 1, limit: 10000, actorType, actorId, action, targetType, startDate, endDate,
+    })
+
+    // 生成CSV
+    const headers = ['时间', '操作者类型', '操作者ID', '操作者名称', '操作', '目标类型', '目标ID', '目标名称', '变更前', '变更后', 'IP地址']
+    const rows = result.data.map(log => [
+      log.created_at,
+      log.actor_type,
+      log.actor_id || '',
+      log.actor_name || '',
+      log.action,
+      log.target_type || '',
+      log.target_id || '',
+      log.target_name || '',
+      log.old_value || '',
+      log.new_value || '',
+      log.ip_address || '',
+    ])
+
+    const csvContent = [headers.join(','), ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n')
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+    res.setHeader('Content-Disposition', `attachment; filename=audit_logs_${new Date().toISOString().slice(0, 10)}.csv`)
+    res.send('\uFEFF' + csvContent)  // 添加BOM以支持Excel中文
+  } catch (err) {
+    log.error({ err }, 'Failed to export audit logs')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '导出审计日志失败' })
+  }
+})
+
+// 异常行为检测
+app.get('/api/admin/audit-logs/anomalies', adminAuthMiddleware, async (req, res) => {
+  try {
+    const anomalies: Array<{ type: string; severity: string; details: any }> = []
+    const oneHourAgo = new Date(Date.now() - 3600000).toISOString()
+
+    // 1. 检测登录失败异常（1小时内超过5次）
+    const loginFailures = await queryAuditLogs({
+      action: ['admin_login_failed', 'user_login_failed'],
+      startDate: oneHourAgo,
+      limit: 1000,
+    })
+
+    // 按IP分组统计
+    const ipCounts: Record<string, number> = {}
+    loginFailures.data.forEach(log => {
+      const ip = log.ip_address || 'unknown'
+      ipCounts[ip] = (ipCounts[ip] || 0) + 1
+    })
+
+    Object.entries(ipCounts).forEach(([ip, count]) => {
+      if (count >= 5) {
+        anomalies.push({
+          type: 'brute_force_attempt',
+          severity: 'high',
+          details: { ip, count, timeRange: '1h' },
+        })
+      }
+    })
+
+    // 2. 检测越权操作
+    const accessDenied = await queryAuditLogs({
+      action: ['access_denied'],
+      startDate: oneHourAgo,
+      limit: 1000,
+    })
+
+    // 按用户分组统计
+    const userDeniedCounts: Record<string, number> = {}
+    accessDenied.data.forEach(log => {
+      const userId = log.actor_id || 'unknown'
+      userDeniedCounts[userId] = (userDeniedCounts[userId] || 0) + 1
+    })
+
+    Object.entries(userDeniedCounts).forEach(([userId, count]) => {
+      if (count >= 3) {
+        anomalies.push({
+          type: 'excessive_access_denied',
+          severity: 'medium',
+          details: { userId, count, timeRange: '1h' },
+        })
+      }
+    })
+
+    // 3. 检测JWT鉴权失败
+    const authFailures = await queryAuditLogs({
+      action: ['auth_failed'],
+      startDate: oneHourAgo,
+      limit: 1000,
+    })
+
+    // 按IP分组统计
+    const authIpCounts: Record<string, number> = {}
+    authFailures.data.forEach(log => {
+      const ip = log.ip_address || 'unknown'
+      authIpCounts[ip] = (authIpCounts[ip] || 0) + 1
+    })
+
+    Object.entries(authIpCounts).forEach(([ip, count]) => {
+      if (count >= 10) {
+        anomalies.push({
+          type: 'token_replay_attempt',
+          severity: 'high',
+          details: { ip, count, timeRange: '1h' },
+        })
+      }
+    })
+
+    res.json({ anomalies, checkedAt: new Date().toISOString() })
+  } catch (err) {
+    log.error({ err }, 'Failed to detect anomalies')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '异常检测失败' })
   }
 })
 
