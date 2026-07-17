@@ -485,7 +485,8 @@ function initSchema(database: Database): void {
       target_name   TEXT,
       old_value     TEXT,
       new_value     TEXT,
-      ip_address    TEXT
+      ip_address    TEXT,
+      hash          TEXT
     )
   `)
   database.run('CREATE INDEX IF NOT EXISTS idx_audit_created_at ON audit_logs(created_at DESC)')

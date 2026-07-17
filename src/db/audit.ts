@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
+import crypto from 'crypto'
 import { getDb, saveDb } from './index.js'
 import { getLogger } from '../logger.js'
 
@@ -19,6 +20,7 @@ export interface AuditLogRow {
   old_value: string | null  // JSON string
   new_value: string | null  // JSON string
   ip_address: string | null
+  hash: string | null
 }
 
 interface InsertAuditLogParams {
@@ -43,6 +45,11 @@ function truncateValue(value: any): string | null {
   return json
 }
 
+function calculateHash(log: AuditLogRow, previousHash: string | null): string {
+  const data = `${log.id}|${log.created_at}|${log.action}|${log.actor_id || ''}|${previousHash || ''}`
+  return crypto.createHash('sha256').update(data).digest('hex')
+}
+
 /**
  * 插入审计日志（fire-and-forget，不阻塞主流程）
  */
@@ -52,22 +59,47 @@ export async function insertAuditLog(params: InsertAuditLogParams): Promise<void
     const id = uuidv4()
     const now = new Date().toISOString()
 
+    // 获取上一条日志的hash
+    const lastLog = db.prepare('SELECT hash FROM audit_logs ORDER BY created_at DESC LIMIT 1').get() as unknown as { hash: string | null } | undefined
+    const previousHash = lastLog?.hash || null
+
+    // 构建日志对象
+    const newLog: AuditLogRow = {
+      id,
+      created_at: now,
+      actor_type: params.actorType,
+      actor_id: params.actorId || null,
+      actor_name: params.actorName || null,
+      action: params.action,
+      target_type: params.targetType || null,
+      target_id: params.targetId || null,
+      target_name: params.targetName || null,
+      old_value: truncateValue(params.oldValue),
+      new_value: truncateValue(params.newValue),
+      ip_address: params.ipAddress || null,
+      hash: null
+    }
+
+    // 计算hash
+    newLog.hash = calculateHash(newLog, previousHash)
+
     db.run(
-      `INSERT INTO audit_logs (id, created_at, actor_type, actor_id, actor_name, action, target_type, target_id, target_name, old_value, new_value, ip_address)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO audit_logs (id, created_at, actor_type, actor_id, actor_name, action, target_type, target_id, target_name, old_value, new_value, ip_address, hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        id,
-        now,
-        params.actorType,
-        params.actorId || null,
-        params.actorName || null,
-        params.action,
-        params.targetType || null,
-        params.targetId || null,
-        params.targetName || null,
-        truncateValue(params.oldValue),
-        truncateValue(params.newValue),
-        params.ipAddress || null,
+        newLog.id,
+        newLog.created_at,
+        newLog.actor_type,
+        newLog.actor_id,
+        newLog.actor_name,
+        newLog.action,
+        newLog.target_type,
+        newLog.target_id,
+        newLog.target_name,
+        newLog.old_value,
+        newLog.new_value,
+        newLog.ip_address,
+        newLog.hash,
       ],
     )
     saveDb(true)  // 使用写合并，避免高频写入时的性能问题
