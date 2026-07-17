@@ -1,4 +1,7 @@
 import { getDb } from './index.js'
+import { getLogger } from '../logger.js'
+
+const log = getLogger('DB:Menus')
 
 export interface MenuRow {
   id: string
@@ -76,27 +79,32 @@ export async function createMenu(params: CreateMenuParams): Promise<MenuRow> {
   const id = crypto.randomUUID()
   const now = new Date().toISOString()
 
-  const stmt = db.prepare(`
-    INSERT INTO menus (id, parent_id, route_name, label, icon, sort_order, is_visible, require_role, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `)
-  stmt.bind([
-    id,
-    params.parentId ?? null,
-    params.routeName ?? null,
-    params.label,
-    params.icon ?? null,
-    params.sortOrder ?? 0,
-    params.isVisible ?? 1,
-    params.requireRole ?? null,
-    now,
-    now,
-  ])
-  stmt.step()
-  stmt.free()
+  try {
+    const stmt = db.prepare(`
+      INSERT INTO menus (id, parent_id, route_name, label, icon, sort_order, is_visible, require_role, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    stmt.bind([
+      id,
+      params.parentId ?? null,
+      params.routeName ?? null,
+      params.label,
+      params.icon ?? null,
+      params.sortOrder ?? 0,
+      params.isVisible ?? 1,
+      params.requireRole ?? null,
+      now,
+      now,
+    ])
+    stmt.step()
+    stmt.free()
 
-  const menu = await getMenuById(id)
-  return menu!
+    log.info({ menuId: id, label: params.label, routeName: params.routeName }, 'Menu created')
+    return (await getMenuById(id))!
+  } catch (err) {
+    log.error({ err, params: { label: params.label, routeName: params.routeName, parentId: params.parentId } }, 'Failed to create menu')
+    throw err
+  }
 }
 
 /**
@@ -106,53 +114,59 @@ export async function updateMenu(id: string, params: UpdateMenuParams): Promise<
   const db = await getDb()
   const now = new Date().toISOString()
 
-  // 构建动态 UPDATE 语句
-  const updates: string[] = []
-  const values: (string | number | null)[] = []
+  try {
+    // 构建动态 UPDATE 语句
+    const updates: string[] = []
+    const values: (string | number | null)[] = []
 
-  if (params.parentId !== undefined) {
-    updates.push('parent_id = ?')
-    values.push(params.parentId)
-  }
-  if (params.routeName !== undefined) {
-    updates.push('route_name = ?')
-    values.push(params.routeName)
-  }
-  if (params.label !== undefined) {
-    updates.push('label = ?')
-    values.push(params.label)
-  }
-  if (params.icon !== undefined) {
-    updates.push('icon = ?')
-    values.push(params.icon)
-  }
-  if (params.sortOrder !== undefined) {
-    updates.push('sort_order = ?')
-    values.push(params.sortOrder)
-  }
-  if (params.isVisible !== undefined) {
-    updates.push('is_visible = ?')
-    values.push(params.isVisible)
-  }
-  if (params.requireRole !== undefined) {
-    updates.push('require_role = ?')
-    values.push(params.requireRole)
-  }
+    if (params.parentId !== undefined) {
+      updates.push('parent_id = ?')
+      values.push(params.parentId)
+    }
+    if (params.routeName !== undefined) {
+      updates.push('route_name = ?')
+      values.push(params.routeName)
+    }
+    if (params.label !== undefined) {
+      updates.push('label = ?')
+      values.push(params.label)
+    }
+    if (params.icon !== undefined) {
+      updates.push('icon = ?')
+      values.push(params.icon)
+    }
+    if (params.sortOrder !== undefined) {
+      updates.push('sort_order = ?')
+      values.push(params.sortOrder)
+    }
+    if (params.isVisible !== undefined) {
+      updates.push('is_visible = ?')
+      values.push(params.isVisible)
+    }
+    if (params.requireRole !== undefined) {
+      updates.push('require_role = ?')
+      values.push(params.requireRole)
+    }
 
-  if (updates.length === 0) {
+    if (updates.length === 0) {
+      return getMenuById(id)
+    }
+
+    updates.push('updated_at = ?')
+    values.push(now)
+    values.push(id)
+
+    const stmt = db.prepare(`UPDATE menus SET ${updates.join(', ')} WHERE id = ?`)
+    stmt.bind(values)
+    stmt.step()
+    stmt.free()
+
+    log.info({ menuId: id, fields: Object.keys(params) }, 'Menu updated')
     return getMenuById(id)
+  } catch (err) {
+    log.error({ err, menuId: id, params }, 'Failed to update menu')
+    throw err
   }
-
-  updates.push('updated_at = ?')
-  values.push(now)
-  values.push(id)
-
-  const stmt = db.prepare(`UPDATE menus SET ${updates.join(', ')} WHERE id = ?`)
-  stmt.bind(values)
-  stmt.step()
-  stmt.free()
-
-  return getMenuById(id)
 }
 
 /**
@@ -161,33 +175,39 @@ export async function updateMenu(id: string, params: UpdateMenuParams): Promise<
 export async function deleteMenu(id: string): Promise<boolean> {
   const db = await getDb()
 
-  // 先删除角色菜单关联
-  const unlinkStmt = db.prepare('DELETE FROM role_menus WHERE menu_id = ?')
-  unlinkStmt.bind([id])
-  unlinkStmt.step()
-  unlinkStmt.free()
+  try {
+    // 先删除角色菜单关联
+    const unlinkStmt = db.prepare('DELETE FROM role_menus WHERE menu_id = ?')
+    unlinkStmt.bind([id])
+    unlinkStmt.step()
+    unlinkStmt.free()
 
-  // 删除子菜单的角色关联
-  const unlinkChildrenStmt = db.prepare(`
-    DELETE FROM role_menus WHERE menu_id IN (SELECT id FROM menus WHERE parent_id = ?)
-  `)
-  unlinkChildrenStmt.bind([id])
-  unlinkChildrenStmt.step()
-  unlinkChildrenStmt.free()
+    // 删除子菜单的角色关联
+    const unlinkChildrenStmt = db.prepare(`
+      DELETE FROM role_menus WHERE menu_id IN (SELECT id FROM menus WHERE parent_id = ?)
+    `)
+    unlinkChildrenStmt.bind([id])
+    unlinkChildrenStmt.step()
+    unlinkChildrenStmt.free()
 
-  // 删除子菜单
-  const deleteChildrenStmt = db.prepare('DELETE FROM menus WHERE parent_id = ?')
-  deleteChildrenStmt.bind([id])
-  deleteChildrenStmt.step()
-  deleteChildrenStmt.free()
+    // 删除子菜单
+    const deleteChildrenStmt = db.prepare('DELETE FROM menus WHERE parent_id = ?')
+    deleteChildrenStmt.bind([id])
+    deleteChildrenStmt.step()
+    deleteChildrenStmt.free()
 
-  // 删除自身
-  const deleteStmt = db.prepare('DELETE FROM menus WHERE id = ?')
-  deleteStmt.bind([id])
-  const changes = deleteStmt.step()
-  deleteStmt.free()
+    // 删除自身
+    const deleteStmt = db.prepare('DELETE FROM menus WHERE id = ?')
+    deleteStmt.bind([id])
+    const deleted = deleteStmt.step()
+    deleteStmt.free()
 
-  return changes
+    log.info({ menuId: id, deleted }, 'Menu deleted')
+    return deleted
+  } catch (err) {
+    log.error({ err, menuId: id }, 'Failed to delete menu')
+    throw err
+  }
 }
 
 /**
@@ -197,12 +217,19 @@ export async function updateMenuSort(updates: { id: string; sortOrder: number }[
   const db = await getDb()
   const now = new Date().toISOString()
 
-  const stmt = db.prepare('UPDATE menus SET sort_order = ?, updated_at = ? WHERE id = ?')
-  for (const update of updates) {
-    stmt.bind([update.sortOrder, now, update.id])
-    stmt.step()
+  try {
+    const stmt = db.prepare('UPDATE menus SET sort_order = ?, updated_at = ? WHERE id = ?')
+    for (const update of updates) {
+      stmt.bind([update.sortOrder, now, update.id])
+      stmt.step()
+    }
+    stmt.free()
+
+    log.info({ count: updates.length }, 'Menu sort updated')
+  } catch (err) {
+    log.error({ err, count: updates.length }, 'Failed to update menu sort')
+    throw err
   }
-  stmt.free()
 }
 
 /**
@@ -227,20 +254,27 @@ export async function getRoleMenus(role: string): Promise<string[]> {
 export async function setRoleMenus(role: string, menuIds: string[]): Promise<void> {
   const db = await getDb()
 
-  // 删除该角色的旧关联
-  const deleteStmt = db.prepare('DELETE FROM role_menus WHERE role = ?')
-  deleteStmt.bind([role])
-  deleteStmt.step()
-  deleteStmt.free()
+  try {
+    // 删除该角色的旧关联
+    const deleteStmt = db.prepare('DELETE FROM role_menus WHERE role = ?')
+    deleteStmt.bind([role])
+    deleteStmt.step()
+    deleteStmt.free()
 
-  // 插入新关联
-  if (menuIds.length > 0) {
-    const insertStmt = db.prepare('INSERT INTO role_menus (role, menu_id) VALUES (?, ?)')
-    for (const menuId of menuIds) {
-      insertStmt.bind([role, menuId])
-      insertStmt.step()
+    // 插入新关联
+    if (menuIds.length > 0) {
+      const insertStmt = db.prepare('INSERT INTO role_menus (role, menu_id) VALUES (?, ?)')
+      for (const menuId of menuIds) {
+        insertStmt.bind([role, menuId])
+        insertStmt.step()
+      }
+      insertStmt.free()
     }
-    insertStmt.free()
+
+    log.info({ role, menuCount: menuIds.length }, 'Role menus set')
+  } catch (err) {
+    log.error({ err, role, menuCount: menuIds.length }, 'Failed to set role menus')
+    throw err
   }
 }
 

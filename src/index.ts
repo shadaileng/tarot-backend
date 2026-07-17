@@ -64,6 +64,17 @@ import {
 
 const log = getLogger('API')
 
+// 敏感信息脱敏
+function sanitizeBody(body: any): any {
+  if (!body || typeof body !== 'object') return body
+  const sanitized = { ...body }
+  const sensitiveKeys = ['password', 'newPassword', 'oldPassword', 'token', 'secret']
+  for (const key of sensitiveKeys) {
+    if (sanitized[key]) sanitized[key] = '***'
+  }
+  return sanitized
+}
+
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
@@ -1597,6 +1608,11 @@ app.get('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
 // 创建菜单
 app.post('/api/admin/menus', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    log.warn({
+      operator: (req as any).adminUsername,
+      role: (req as any).adminRole,
+      path: req.path,
+    }, 'Readonly admin attempted to create menu')
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能创建菜单' })
     return
   }
@@ -1612,6 +1628,11 @@ app.post('/api/admin/menus', adminAuthMiddleware, async (req, res) => {
     }
 
     if (!label) {
+      log.warn({
+        operator: (req as any).adminUsername,
+        path: req.path,
+        body: req.body,
+      }, 'Invalid input: missing label')
       res.status(400).json({ error: 'INVALID_INPUT', message: 'label 为必填项' })
       return
     }
@@ -1620,6 +1641,11 @@ app.post('/api/admin/menus', adminAuthMiddleware, async (req, res) => {
     if (parentId) {
       const parentMenu = await getMenuById(parentId)
       if (!parentMenu) {
+        log.warn({
+          operator: (req as any).adminUsername,
+          parentId,
+          path: req.path,
+        }, 'Invalid input: parent menu not found')
         res.status(400).json({ error: 'INVALID_INPUT', message: '父菜单不存在' })
         return
       }
@@ -1665,6 +1691,13 @@ app.post('/api/admin/menus', adminAuthMiddleware, async (req, res) => {
       ipAddress: req.ip,
     })
 
+    log.info({
+      operator: (req as any).adminUsername,
+      menuId: menu.id,
+      label: menu.label,
+      routeName: menu.route_name,
+    }, 'Menu created')
+
     res.json({
       id: menu.id,
       parentId: menu.parent_id,
@@ -1676,7 +1709,15 @@ app.post('/api/admin/menus', adminAuthMiddleware, async (req, res) => {
       requireRole: menu.require_role,
     })
   } catch (err) {
-    log.error({ err }, 'Failed to create menu')
+    log.error({
+      err,
+      operator: (req as any).adminUsername,
+      operatorId: (req as any).adminId,
+      role: (req as any).adminRole,
+      ip: req.ip,
+      logId: (req as any).logId,
+      body: req.body,
+    }, 'Failed to create menu')
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '创建菜单失败' })
   }
 })
@@ -1684,6 +1725,12 @@ app.post('/api/admin/menus', adminAuthMiddleware, async (req, res) => {
 // 更新菜单
 app.put('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    log.warn({
+      operator: (req as any).adminUsername,
+      role: (req as any).adminRole,
+      path: req.path,
+      menuId: req.params.id,
+    }, 'Readonly admin attempted to update menu')
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改菜单' })
     return
   }
@@ -1706,6 +1753,11 @@ app.put('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
 
     // 如果更新 parentId，验证不能设为自身或子菜单
     if (parentId && parentId === req.params.id) {
+      log.warn({
+        operator: (req as any).adminUsername,
+        menuId: req.params.id,
+        parentId,
+      }, 'Invalid input: cannot set menu as its own child')
       res.status(400).json({ error: 'INVALID_INPUT', message: '不能将菜单设为自身的子菜单' })
       return
     }
@@ -1756,6 +1808,13 @@ app.put('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
       ipAddress: req.ip,
     })
 
+    log.info({
+      operator: (req as any).adminUsername,
+      menuId: req.params.id,
+      oldLabel: existing.label,
+      newLabel: menu?.label,
+    }, 'Menu updated')
+
     res.json({
       id: menu!.id,
       parentId: menu!.parent_id,
@@ -1767,7 +1826,16 @@ app.put('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
       requireRole: menu!.require_role,
     })
   } catch (err) {
-    log.error({ err }, 'Failed to update menu')
+    log.error({
+      err,
+      operator: (req as any).adminUsername,
+      operatorId: (req as any).adminId,
+      role: (req as any).adminRole,
+      ip: req.ip,
+      logId: (req as any).logId,
+      menuId: req.params.id,
+      body: req.body,
+    }, 'Failed to update menu')
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '更新菜单失败' })
   }
 })
@@ -1775,6 +1843,12 @@ app.put('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
 // 删除菜单
 app.delete('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    log.warn({
+      operator: (req as any).adminUsername,
+      role: (req as any).adminRole,
+      path: req.path,
+      menuId: req.params.id,
+    }, 'Readonly admin attempted to delete menu')
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能删除菜单' })
     return
   }
@@ -1800,9 +1874,24 @@ app.delete('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
       ipAddress: req.ip,
     })
 
+    log.info({
+      operator: (req as any).adminUsername,
+      menuId: req.params.id,
+      label: existing.label,
+      routeName: existing.route_name,
+    }, 'Menu deleted')
+
     res.json({ message: '菜单已删除' })
   } catch (err) {
-    log.error({ err }, 'Failed to delete menu')
+    log.error({
+      err,
+      operator: (req as any).adminUsername,
+      operatorId: (req as any).adminId,
+      role: (req as any).adminRole,
+      ip: req.ip,
+      logId: (req as any).logId,
+      menuId: req.params.id,
+    }, 'Failed to delete menu')
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '删除菜单失败' })
   }
 })
@@ -1817,6 +1906,11 @@ app.put('/api/admin/menus/sort', adminAuthMiddleware, async (req, res) => {
     const { updates } = req.body as { updates: { id: string; sortOrder: number }[] }
 
     if (!Array.isArray(updates) || updates.length === 0) {
+      log.warn({
+        operator: (req as any).adminUsername,
+        path: req.path,
+        body: req.body,
+      }, 'Invalid input: updates must be a non-empty array')
       res.status(400).json({ error: 'INVALID_INPUT', message: 'updates 为必填项' })
       return
     }
@@ -1835,9 +1929,22 @@ app.put('/api/admin/menus/sort', adminAuthMiddleware, async (req, res) => {
       ipAddress: req.ip,
     })
 
+    log.info({
+      operator: (req as any).adminUsername,
+      count: updates.length,
+    }, 'Menu sort updated')
+
     res.json({ message: '菜单排序已更新' })
   } catch (err) {
-    log.error({ err }, 'Failed to update menu sort')
+    log.error({
+      err,
+      operator: (req as any).adminUsername,
+      operatorId: (req as any).adminId,
+      role: (req as any).adminRole,
+      ip: req.ip,
+      logId: (req as any).logId,
+      body: req.body,
+    }, 'Failed to update menu sort')
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '更新菜单排序失败' })
   }
 })
@@ -1848,7 +1955,10 @@ app.get('/api/admin/menus/role/:role', adminAuthMiddleware, async (req, res) => 
     const menuIds = await getRoleMenus(req.params.role)
     res.json({ role: req.params.role, menuIds })
   } catch (err) {
-    log.error({ err }, 'Failed to get role menus')
+    log.error({
+      err,
+      role: req.params.role,
+    }, 'Failed to get role menus')
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取角色菜单失败' })
   }
 })
@@ -1856,6 +1966,12 @@ app.get('/api/admin/menus/role/:role', adminAuthMiddleware, async (req, res) => 
 // 设置角色菜单
 app.put('/api/admin/menus/role/:role', adminAuthMiddleware, async (req, res) => {
   if ((req as any).adminRole === 'readonly') {
+    log.warn({
+      operator: (req as any).adminUsername,
+      role: (req as any).adminRole,
+      path: req.path,
+      targetRole: req.params.role,
+    }, 'Readonly admin attempted to update role menus')
     res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改角色菜单' })
     return
   }
@@ -1863,6 +1979,11 @@ app.put('/api/admin/menus/role/:role', adminAuthMiddleware, async (req, res) => 
     const { menuIds } = req.body as { menuIds: string[] }
 
     if (!Array.isArray(menuIds)) {
+      log.warn({
+        operator: (req as any).adminUsername,
+        path: req.path,
+        body: req.body,
+      }, 'Invalid input: menuIds must be an array')
       res.status(400).json({ error: 'INVALID_INPUT', message: 'menuIds 必须为数组' })
       return
     }
@@ -1882,9 +2003,24 @@ app.put('/api/admin/menus/role/:role', adminAuthMiddleware, async (req, res) => 
       ipAddress: req.ip,
     })
 
+    log.info({
+      operator: (req as any).adminUsername,
+      role: req.params.role,
+      menuCount: menuIds.length,
+    }, 'Role menus updated')
+
     res.json({ message: '角色菜单已更新' })
   } catch (err) {
-    log.error({ err }, 'Failed to set role menus')
+    log.error({
+      err,
+      operator: (req as any).adminUsername,
+      operatorId: (req as any).adminId,
+      role: (req as any).adminRole,
+      ip: req.ip,
+      logId: (req as any).logId,
+      targetRole: req.params.role,
+      body: req.body,
+    }, 'Failed to set role menus')
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '设置角色菜单失败' })
   }
 })

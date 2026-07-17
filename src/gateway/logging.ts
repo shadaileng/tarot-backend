@@ -7,12 +7,37 @@ const log = getLogger('gateway')
 
 const SKIP_PATHS = ['/', '/api/health', '/api/metrics', '/api/logs']
 
+// 精确匹配表（O(1) 查找）
+const EXACT_TARGETS = new Map<string, string>([
+  ['/api/reading', 'reading'],
+  ['/api/checkin', 'user'],
+  ['/api/tasks', 'user'],
+])
+
+// 前缀匹配表（按长度降序排列，避免短前缀误匹配）
+const PREFIX_TARGETS: [string, string][] = [
+  ['/api/admin/menus', 'admin:menu'],
+  ['/api/admin/admins', 'admin:admin'],
+  ['/api/admin/users', 'admin:user'],
+  ['/api/admin/audit-logs', 'admin:audit'],
+  ['/api/admin/client-events', 'admin:events'],
+  ['/api/admin', 'admin'],
+  ['/api/auth', 'auth'],
+  ['/admin/auth', 'auth'],
+  ['/api/user', 'user'],
+  ['/api/poster', 'poster'],
+]
+
 function resolveTarget(path: string): string {
-  if (path === '/api/reading') return 'reading'
-  if (path.startsWith('/api/poster')) return 'poster'
-  if (path.startsWith('/api/auth') || path.startsWith('/admin/auth')) return 'auth'
-  if (path.startsWith('/api/user') || path === '/api/checkin' || path.startsWith('/api/tasks') || path.startsWith('/api/invite')) return 'user'
-  if (path.startsWith('/api/admin')) return 'admin'
+  // 1. 精确匹配（O(1)）
+  const exact = EXACT_TARGETS.get(path)
+  if (exact) return exact
+
+  // 2. 前缀匹配（有序，避免 /api/admin 误匹配 /api/admin/menus）
+  for (const [prefix, target] of PREFIX_TARGETS) {
+    if (path.startsWith(prefix)) return target
+  }
+
   return 'other'
 }
 
