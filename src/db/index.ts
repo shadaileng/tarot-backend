@@ -260,6 +260,33 @@ function initSchema(database: Database): void {
   } catch {}
   database.run(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE email IS NOT NULL AND email != '' AND deleted_at IS NULL`)
 
+  // 兼容已有数据库：menus.route_name 去掉 NOT NULL 约束
+  try {
+    const tableInfo = database.exec("SELECT sql FROM sqlite_master WHERE type='table' AND name='menus'")
+    const createSql = tableInfo[0]?.values[0]?.[0] as string || ''
+    if (createSql.includes('route_name TEXT NOT NULL')) {
+      database.run('CREATE TABLE menus_backup AS SELECT * FROM menus')
+      database.run('DROP TABLE menus')
+      database.run(`
+        CREATE TABLE menus (
+          id            TEXT PRIMARY KEY,
+          parent_id     TEXT,
+          route_name    TEXT,
+          label         TEXT NOT NULL,
+          icon          TEXT,
+          sort_order    INTEGER NOT NULL DEFAULT 0,
+          is_visible    INTEGER NOT NULL DEFAULT 1,
+          require_role  TEXT,
+          created_at    TEXT NOT NULL,
+          updated_at    TEXT NOT NULL,
+          FOREIGN KEY (parent_id) REFERENCES menus(id) ON DELETE CASCADE
+        )
+      `)
+      database.run('INSERT INTO menus SELECT * FROM menus_backup')
+      database.run('DROP TABLE menus_backup')
+    }
+  } catch {}
+
   // ========== 积分等级相关表 ==========
 
   database.run(`
