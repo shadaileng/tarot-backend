@@ -591,6 +591,7 @@ export function initDefaultMenus(): void {
     ['menu-checkin-stats','menu-user',     'checkin-stats',   '签到统计',  'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', 3, null],
     ['menu-invite-records','menu-user',    'invite-records',  '邀请记录',  'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1', 4, null],
     // 运营管理
+    ['menu-menus',           'menu-operation', 'menus',           '菜单管理', 'M4 6h16M4 12h16M4 18h16', 0, 'admin'],
     ['menu-admins',           'menu-operation', 'admins',           '管理员管理', 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', 1, 'admin'],
     ['menu-levels',           'menu-operation', 'levels',           '等级管理', 'M13 10V3L4 14h7v7l9-11h-7z', 2, null],
     ['menu-task-definitions', 'menu-operation', 'task-definitions', '任务管理', 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4', 3, null],
