@@ -27,7 +27,7 @@ import { listReadingTasks, getReadingTaskById, getAsyncTaskStats } from './db/re
 import { queryUsers, unbindEmail, softDeleteUser, restoreUser } from './db/user.js'
 import { getAllConfig, upsertConfig, initDefaultConfig, loadUserConfig } from './db/config.js'
 import { getAllPageSections, updatePageSectionVisibility } from './db/page-sections.js'
-import { getMyMenus } from './db/menus.js'
+import { getMyMenus, getAllMenus, getMenuById, createMenu, updateMenu, deleteMenu, updateMenuSort, getRoleMenus, setRoleMenus } from './db/menus.js'
 import { getDb, saveDb } from './db/index.js'
 import { wechatLoginHandler } from './auth/wechat-login.js'
 import { emailRegisterHandler } from './auth/email-register.js'
@@ -1541,6 +1541,314 @@ app.get('/api/admin/menus/my', adminAuthMiddleware, async (req, res) => {
   } catch (err) {
     log.error({ err }, 'Failed to get my menus')
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取菜单失败' })
+  }
+})
+
+// 获取所有菜单（管理端）
+app.get('/api/admin/menus', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const menus = await getAllMenus()
+    res.json({
+      menus: menus.map(m => ({
+        id: m.id,
+        parentId: m.parent_id,
+        routeName: m.route_name,
+        label: m.label,
+        icon: m.icon,
+        sortOrder: m.sort_order,
+        isVisible: m.is_visible === 1,
+        requireRole: m.require_role,
+        createdAt: m.created_at,
+        updatedAt: m.updated_at,
+      }))
+    })
+  } catch (err) {
+    log.error({ err }, 'Failed to get all menus')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取菜单列表失败' })
+  }
+})
+
+// 获取单个菜单
+app.get('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
+  try {
+    const menu = await getMenuById(req.params.id)
+    if (!menu) {
+      res.status(404).json({ error: 'NOT_FOUND', message: '菜单不存在' })
+      return
+    }
+    res.json({
+      id: menu.id,
+      parentId: menu.parent_id,
+      routeName: menu.route_name,
+      label: menu.label,
+      icon: menu.icon,
+      sortOrder: menu.sort_order,
+      isVisible: menu.is_visible === 1,
+      requireRole: menu.require_role,
+      createdAt: menu.created_at,
+      updatedAt: menu.updated_at,
+    })
+  } catch (err) {
+    log.error({ err }, 'Failed to get menu')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取菜单失败' })
+  }
+})
+
+// 创建菜单
+app.post('/api/admin/menus', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能创建菜单' })
+    return
+  }
+  try {
+    const { parentId, routeName, label, icon, sortOrder, isVisible, requireRole } = req.body as {
+      parentId?: string | null
+      routeName?: string | null
+      label: string
+      icon?: string | null
+      sortOrder?: number
+      isVisible?: boolean
+      requireRole?: string | null
+    }
+
+    if (!label) {
+      res.status(400).json({ error: 'INVALID_INPUT', message: 'label 为必填项' })
+      return
+    }
+
+    // 如果有 parentId，验证父菜单存在
+    if (parentId) {
+      const parentMenu = await getMenuById(parentId)
+      if (!parentMenu) {
+        res.status(400).json({ error: 'INVALID_INPUT', message: '父菜单不存在' })
+        return
+      }
+    }
+
+    const menu = await createMenu({
+      parentId,
+      routeName,
+      label,
+      icon,
+      sortOrder,
+      isVisible: isVisible === false ? 0 : 1,
+      requireRole,
+    })
+
+    saveDb()
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_create_menu',
+      targetType: 'menu',
+      targetId: menu.id,
+      newValue: { label: menu.label, routeName: menu.route_name },
+      ipAddress: req.ip,
+    })
+
+    res.json({
+      id: menu.id,
+      parentId: menu.parent_id,
+      routeName: menu.route_name,
+      label: menu.label,
+      icon: menu.icon,
+      sortOrder: menu.sort_order,
+      isVisible: menu.is_visible === 1,
+      requireRole: menu.require_role,
+    })
+  } catch (err) {
+    log.error({ err }, 'Failed to create menu')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '创建菜单失败' })
+  }
+})
+
+// 更新菜单
+app.put('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改菜单' })
+    return
+  }
+  try {
+    const existing = await getMenuById(req.params.id)
+    if (!existing) {
+      res.status(404).json({ error: 'NOT_FOUND', message: '菜单不存在' })
+      return
+    }
+
+    const { parentId, routeName, label, icon, sortOrder, isVisible, requireRole } = req.body as {
+      parentId?: string | null
+      routeName?: string | null
+      label?: string
+      icon?: string | null
+      sortOrder?: number
+      isVisible?: boolean
+      requireRole?: string | null
+    }
+
+    // 如果更新 parentId，验证不能设为自身或子菜单
+    if (parentId && parentId === req.params.id) {
+      res.status(400).json({ error: 'INVALID_INPUT', message: '不能将菜单设为自身的子菜单' })
+      return
+    }
+
+    const menu = await updateMenu(req.params.id, {
+      parentId,
+      routeName,
+      label,
+      icon,
+      sortOrder,
+      isVisible: isVisible !== undefined ? (isVisible ? 1 : 0) : undefined,
+      requireRole,
+    })
+
+    saveDb()
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_update_menu',
+      targetType: 'menu',
+      targetId: req.params.id,
+      oldValue: { label: existing.label },
+      newValue: { label: menu?.label },
+      ipAddress: req.ip,
+    })
+
+    res.json({
+      id: menu!.id,
+      parentId: menu!.parent_id,
+      routeName: menu!.route_name,
+      label: menu!.label,
+      icon: menu!.icon,
+      sortOrder: menu!.sort_order,
+      isVisible: menu!.is_visible === 1,
+      requireRole: menu!.require_role,
+    })
+  } catch (err) {
+    log.error({ err }, 'Failed to update menu')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '更新菜单失败' })
+  }
+})
+
+// 删除菜单
+app.delete('/api/admin/menus/:id', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能删除菜单' })
+    return
+  }
+  try {
+    const existing = await getMenuById(req.params.id)
+    if (!existing) {
+      res.status(404).json({ error: 'NOT_FOUND', message: '菜单不存在' })
+      return
+    }
+
+    await deleteMenu(req.params.id)
+    saveDb()
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_delete_menu',
+      targetType: 'menu',
+      targetId: req.params.id,
+      oldValue: { label: existing.label, routeName: existing.route_name },
+      ipAddress: req.ip,
+    })
+
+    res.json({ message: '菜单已删除' })
+  } catch (err) {
+    log.error({ err }, 'Failed to delete menu')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '删除菜单失败' })
+  }
+})
+
+// 批量更新菜单排序
+app.put('/api/admin/menus/sort', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改菜单排序' })
+    return
+  }
+  try {
+    const { updates } = req.body as { updates: { id: string; sortOrder: number }[] }
+
+    if (!Array.isArray(updates) || updates.length === 0) {
+      res.status(400).json({ error: 'INVALID_INPUT', message: 'updates 为必填项' })
+      return
+    }
+
+    await updateMenuSort(updates)
+    saveDb()
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_update_menu_sort',
+      targetType: 'menu',
+      newValue: { count: updates.length },
+      ipAddress: req.ip,
+    })
+
+    res.json({ message: '菜单排序已更新' })
+  } catch (err) {
+    log.error({ err }, 'Failed to update menu sort')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '更新菜单排序失败' })
+  }
+})
+
+// 获取角色菜单
+app.get('/api/admin/menus/role/:role', adminAuthMiddleware, async (req, res) => {
+  try {
+    const menuIds = await getRoleMenus(req.params.role)
+    res.json({ role: req.params.role, menuIds })
+  } catch (err) {
+    log.error({ err }, 'Failed to get role menus')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取角色菜单失败' })
+  }
+})
+
+// 设置角色菜单
+app.put('/api/admin/menus/role/:role', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能修改角色菜单' })
+    return
+  }
+  try {
+    const { menuIds } = req.body as { menuIds: string[] }
+
+    if (!Array.isArray(menuIds)) {
+      res.status(400).json({ error: 'INVALID_INPUT', message: 'menuIds 必须为数组' })
+      return
+    }
+
+    await setRoleMenus(req.params.role, menuIds)
+    saveDb()
+
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_update_role_menus',
+      targetType: 'role',
+      targetId: req.params.role,
+      newValue: { menuCount: menuIds.length },
+      ipAddress: req.ip,
+    })
+
+    res.json({ message: '角色菜单已更新' })
+  } catch (err) {
+    log.error({ err }, 'Failed to set role menus')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '设置角色菜单失败' })
   }
 })
 
