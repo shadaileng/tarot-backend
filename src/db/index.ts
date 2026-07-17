@@ -264,7 +264,7 @@ function initSchema(database: Database): void {
   try {
     const tableInfo = database.exec("SELECT sql FROM sqlite_master WHERE type='table' AND name='menus'")
     const createSql = tableInfo[0]?.values[0]?.[0] as string || ''
-    if (createSql.includes('route_name TEXT NOT NULL')) {
+    if (/\broute_name\s+TEXT\s+NOT\s+NULL\b/.test(createSql)) {
       database.run('CREATE TABLE menus_backup AS SELECT * FROM menus')
       database.run('DROP TABLE menus')
       database.run(`
