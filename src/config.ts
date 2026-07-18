@@ -27,8 +27,12 @@ export const configMeta: ConfigMeta[] = [
   { key: 'POOL_ACQUIRE_TIMEOUT_MS', envKey: 'POOL_ACQUIRE_TIMEOUT_MS', group: '性能配置', editable: true, type: 'number', defaultValue: '30000' },
   { key: 'PUPPETEER_PROTOCOL_TIMEOUT', envKey: 'PUPPETEER_PROTOCOL_TIMEOUT', group: '性能配置', editable: true, type: 'number', defaultValue: '60000' },
 
-  { key: 'LOG_RETENTION_DAYS', envKey: 'LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '30' },
-  { key: 'AUDIT_LOG_RETENTION_DAYS', envKey: 'AUDIT_LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '90' },
+  { key: 'LOG_RETENTION_DAYS', envKey: 'LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '30', description: '请求日志保留天数' },
+  { key: 'AUDIT_LOG_RETENTION_DAYS', envKey: 'AUDIT_LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '90', description: '审计日志保留天数' },
+
+  // ========== 备份配置 ==========
+  { key: 'BACKUP_DIR', envKey: 'BACKUP_DIR', group: '备份配置', editable: false, type: 'string', defaultValue: '', description: '备份文件存储目录（默认与 DB_PATH 同级 backups/）' },
+  { key: 'UPLOADS_DIR', envKey: 'UPLOADS_DIR', group: '备份配置', editable: false, type: 'string', defaultValue: '', description: '上传文件目录（默认与 DB_PATH 同级 uploads/）' },
 
   { key: 'WECHAT_APPID',  envKey: 'WECHAT_APPID',  group: '微信配置', editable: true, sensitive: false, type: 'string', defaultValue: '' },
   { key: 'WECHAT_SECRET', envKey: 'WECHAT_SECRET', group: '微信配置', editable: true, sensitive: true,  type: 'string', defaultValue: '' },
@@ -99,6 +103,12 @@ export const config = {
     retentionDays: parseInt(process.env.AUDIT_LOG_RETENTION_DAYS || '90', 10),  // 默认90天
   },
 
+  backup: {
+    dir: process.env.BACKUP_DIR || '',
+  },
+
+  uploadsDir: process.env.UPLOADS_DIR || '',
+
   adminAccessExpiresIn: process.env.ADMIN_ACCESS_EXPIRES_IN || '2h',
   adminRefreshExpiresIn: process.env.ADMIN_REFRESH_EXPIRES_IN || '30d',
   adminInitUsername: process.env.ADMIN_INIT_USERNAME || 'admin',
@@ -111,6 +121,34 @@ export function getConfigDefaults(): Record<string, string> {
     defaults[meta.envKey] = process.env[meta.envKey] || meta.defaultValue
   }
   return defaults
+}
+
+/**
+ * 获取备份目录路径：优先使用 BACKUP_DIR 环境变量，否则取 DB_PATH 的同级 backups/ 目录
+ * 例如 DB_PATH=/data/tarot.db → /data/backups
+ */
+export function getBackupDir(): string {
+  if (config.backup.dir) return config.backup.dir
+  const dbPath = config.db.path
+  const lastSlash = dbPath.lastIndexOf('/')
+  const lastBackslash = dbPath.lastIndexOf('\\')
+  const sep = Math.max(lastSlash, lastBackslash)
+  const dbDir = sep >= 0 ? dbPath.substring(0, sep) : '.'
+  return dbDir + '/backups'
+}
+
+/**
+ * 获取上传目录路径：优先使用 UPLOADS_DIR 环境变量，否则取 DB_PATH 的同级 uploads/ 目录
+ * 例如 DB_PATH=/data/tarot.db → /data/uploads
+ */
+export function getUploadsDir(): string {
+  if (config.uploadsDir) return config.uploadsDir
+  const dbPath = config.db.path
+  const lastSlash = dbPath.lastIndexOf('/')
+  const lastBackslash = dbPath.lastIndexOf('\\')
+  const sep = Math.max(lastSlash, lastBackslash)
+  const dbDir = sep >= 0 ? dbPath.substring(0, sep) : '.'
+  return dbDir + '/uploads'
 }
 
 export function updateConfig(key: string, value: string): void {
@@ -161,6 +199,12 @@ export function updateConfig(key: string, value: string): void {
       break
     case 'AUDIT_LOG_RETENTION_DAYS':
       config.auditLog.retentionDays = parseInt(value, 10)
+      break
+    case 'BACKUP_DIR':
+      config.backup.dir = value
+      break
+    case 'UPLOADS_DIR':
+      config.uploadsDir = value
       break
     case 'PUPPETEER_PROTOCOL_TIMEOUT':
       config.puppeteer.protocolTimeout = parseInt(value, 10)

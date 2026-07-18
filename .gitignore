@@ -11,6 +11,9 @@ data/
 # 上传文件
 uploads/
 
+# 备份文件
+backups/
+
 # 环境变量（含敏感信息）
 .env
 .env.local

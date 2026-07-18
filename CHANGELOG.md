@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- 备份路径配置化：新增 `BACKUP_DIR`、`UPLOADS_DIR` 环境变量，备份路径依据项目配置确定
+- 备份脚本 `scripts/backup.sh`：从环境变量读取路径，支持 WAL checkpoint + 压缩打包
+- 恢复脚本 `scripts/restore.sh`：从环境变量读取路径，支持完整性校验
 - 统一日志清理调度器（`src/db/cleanup.ts`），替代分散的 setInterval
 - `request_logs` 自动清理（`cleanupRequestLogs()`），默认保留 30 天
 - `poster_tasks` 旧数据清理（`cleanupPosterTasks()`），已完成/失败/取消的任务自动清理
@@ -28,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - 移除 `index.ts` 中分散的审计日志和客户端事件日志清理 setInterval，改用统一调度器
 - `readings` 表不纳入自动清理，永久保留用户解读数据
+- 备份范围移除 `.env` 文件，环境变量通过平台配置注入，不在代码中保存
 
 ## [2.30.0] - 2026-07-17
 

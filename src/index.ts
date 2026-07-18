@@ -3,7 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
 import express, { type Request, type Response, type NextFunction } from 'express'
-import { config, configMeta, updateConfig, maskSensitiveValue, getConfigDefaults } from './config.js'
+import { config, configMeta, updateConfig, maskSensitiveValue, getConfigDefaults, getUploadsDir } from './config.js'
 import { corsMiddleware } from './middleware/cors.js'
 import { adminAuthMiddleware, type AdminJwtPayload } from './middleware/admin-auth.js'
 import { jwtAuthMiddleware } from './middleware/jwt-auth.js'
@@ -84,7 +84,7 @@ app.use(express.json({ limit: '1mb' }))
 app.use(corsMiddleware)
 
 app.use('/api/cards', express.static(path.join(__dirname, '../assets/cards')))
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
+app.use('/uploads', express.static(getUploadsDir()))
 
 app.use(loggingMiddleware)
 
