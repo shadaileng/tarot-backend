@@ -13,8 +13,8 @@ BACKUP_FILE="${1:-}"
 SKIP_CONFIRM="${2:-}"
 DB_PATH="${DB_PATH:-./data/tarot.db}"
 DATA_DIR="$(dirname "${DB_PATH}")"
-UPLOADS_DIR="${UPLOADS_DIR:-${DATA_DIR}/uploads}"
-BACKUP_DIR="${BACKUP_DIR:-${DATA_DIR}/backups}"
+UPLOADS_DIR="${UPLOADS_DIR:-./data/uploads}"
+BACKUP_DIR="${BACKUP_DIR:-./data/backups}"
 
 # ==================== 颜色输出 ====================
 RED='\033[0;31m'

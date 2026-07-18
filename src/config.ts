@@ -31,8 +31,8 @@ export const configMeta: ConfigMeta[] = [
   { key: 'AUDIT_LOG_RETENTION_DAYS', envKey: 'AUDIT_LOG_RETENTION_DAYS', group: '日志配置', editable: true, type: 'number', defaultValue: '90', description: '审计日志保留天数' },
 
   // ========== 备份配置 ==========
-  { key: 'BACKUP_DIR', envKey: 'BACKUP_DIR', group: '备份配置', editable: false, type: 'string', defaultValue: '', description: '备份文件存储目录（默认与 DB_PATH 同级 backups/）' },
-  { key: 'UPLOADS_DIR', envKey: 'UPLOADS_DIR', group: '备份配置', editable: false, type: 'string', defaultValue: '', description: '上传文件目录（默认与 DB_PATH 同级 uploads/）' },
+  { key: 'BACKUP_DIR', envKey: 'BACKUP_DIR', group: '备份配置', editable: false, type: 'string', defaultValue: './data/backups', description: '备份文件存储目录' },
+  { key: 'UPLOADS_DIR', envKey: 'UPLOADS_DIR', group: '备份配置', editable: false, type: 'string', defaultValue: './data/uploads', description: '上传文件目录' },
 
   { key: 'WECHAT_APPID',  envKey: 'WECHAT_APPID',  group: '微信配置', editable: true, sensitive: false, type: 'string', defaultValue: '' },
   { key: 'WECHAT_SECRET', envKey: 'WECHAT_SECRET', group: '微信配置', editable: true, sensitive: true,  type: 'string', defaultValue: '' },
@@ -104,10 +104,10 @@ export const config = {
   },
 
   backup: {
-    dir: process.env.BACKUP_DIR || '',
+    dir: process.env.BACKUP_DIR || './data/backups',
   },
 
-  uploadsDir: process.env.UPLOADS_DIR || '',
+  uploadsDir: process.env.UPLOADS_DIR || './data/uploads',
 
   adminAccessExpiresIn: process.env.ADMIN_ACCESS_EXPIRES_IN || '2h',
   adminRefreshExpiresIn: process.env.ADMIN_REFRESH_EXPIRES_IN || '30d',
@@ -124,31 +124,17 @@ export function getConfigDefaults(): Record<string, string> {
 }
 
 /**
- * 获取备份目录路径：优先使用 BACKUP_DIR 环境变量，否则取 DB_PATH 的同级 backups/ 目录
- * 例如 DB_PATH=/data/tarot.db → /data/backups
+ * 获取备份目录路径
  */
 export function getBackupDir(): string {
-  if (config.backup.dir) return config.backup.dir
-  const dbPath = config.db.path
-  const lastSlash = dbPath.lastIndexOf('/')
-  const lastBackslash = dbPath.lastIndexOf('\\')
-  const sep = Math.max(lastSlash, lastBackslash)
-  const dbDir = sep >= 0 ? dbPath.substring(0, sep) : '.'
-  return dbDir + '/backups'
+  return config.backup.dir
 }
 
 /**
- * 获取上传目录路径：优先使用 UPLOADS_DIR 环境变量，否则取 DB_PATH 的同级 uploads/ 目录
- * 例如 DB_PATH=/data/tarot.db → /data/uploads
+ * 获取上传目录路径
  */
 export function getUploadsDir(): string {
-  if (config.uploadsDir) return config.uploadsDir
-  const dbPath = config.db.path
-  const lastSlash = dbPath.lastIndexOf('/')
-  const lastBackslash = dbPath.lastIndexOf('\\')
-  const sep = Math.max(lastSlash, lastBackslash)
-  const dbDir = sep >= 0 ? dbPath.substring(0, sep) : '.'
-  return dbDir + '/uploads'
+  return config.uploadsDir
 }
 
 export function updateConfig(key: string, value: string): void {

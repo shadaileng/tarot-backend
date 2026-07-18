@@ -12,8 +12,8 @@ set -euo pipefail
 # ==================== 配置（从环境变量读取，与 src/config.ts 一致） ====================
 DB_PATH="${DB_PATH:-./data/tarot.db}"
 DATA_DIR="$(dirname "${DB_PATH}")"
-UPLOADS_DIR="${UPLOADS_DIR:-${DATA_DIR}/uploads}"
-BACKUP_DIR="${1:-${BACKUP_DIR:-${DATA_DIR}/backups}}"
+UPLOADS_DIR="${UPLOADS_DIR:-./data/uploads}"
+BACKUP_DIR="${1:-${BACKUP_DIR:-./data/backups}}"
 
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_NAME="tarot-backup-${TIMESTAMP}"

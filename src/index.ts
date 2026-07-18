@@ -2758,7 +2758,7 @@ app.get('/api/admin/audit-logs/anomalies', adminAuthMiddleware, async (req, res)
 
 const uploadStorage = multer.diskStorage({
   destination: (_req: any, _file: any, cb: (err: Error | null, dest: string) => void) => {
-    const dir = path.join(__dirname, '../uploads/feedback')
+    const dir = path.join(getUploadsDir(), 'feedback')
     fs.mkdirSync(dir, { recursive: true })
     cb(null, dir)
   },
@@ -2817,7 +2817,7 @@ app.post('/api/upload/feedback', jwtAuthMiddleware, (req: Request, res: Response
 const avatarUpload = multer({
   storage: multer.diskStorage({
     destination: (_req: any, _file: any, cb: (err: Error | null, dest: string) => void) => {
-      const dir = path.join(__dirname, '../uploads/avatar')
+      const dir = path.join(getUploadsDir(), 'avatar')
       fs.mkdirSync(dir, { recursive: true })
       cb(null, dir)
     },

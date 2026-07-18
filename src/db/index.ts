@@ -1,7 +1,7 @@
 import initSqlJs from 'sql.js'
 import fs from 'fs'
 import path from 'path'
-import { config } from '../config.js'
+import { config, getUploadsDir } from '../config.js'
 import { getLogger } from '../logger.js'
 import type { SqlJsStatic, Database } from 'sql.js'
 
@@ -825,10 +825,9 @@ export function getDbStats(): PersistenceStats {
   })
 
   // 上传文件
-  const dbDir = path.dirname(config.db.path)
-  const projectRoot = path.resolve(dbDir, '..')
-  const avatarDir = path.join(projectRoot, 'uploads/avatar')
-  const feedbackDir = path.join(projectRoot, 'uploads/feedback')
+  const uploadsDir = getUploadsDir()
+  const avatarDir = path.join(uploadsDir, 'avatar')
+  const feedbackDir = path.join(uploadsDir, 'feedback')
   const avatarStats = getDirSize(avatarDir)
   const feedbackStats = getDirSize(feedbackDir)
 
