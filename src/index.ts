@@ -3213,6 +3213,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 })
 
 async function start(): Promise<void> {
+  log.info({ UPLOADS_DIR: process.env.UPLOADS_DIR }, 'ENV UPLOADS_DIR check at startup')
   await getDb()
   // DB 初始化日志由 src/db/index.ts 的 getDb() 内部输出（含 path + new 标记）
 

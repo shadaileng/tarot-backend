@@ -60,7 +60,7 @@ export async function createBackup(): Promise<{
   const dbPath = config.db.path
   const uploadsDir = getUploadsDir()
 
-  log.info({ dbPath, uploadsDir, backupDir }, 'Creating backup')
+  log.info({ dbPath, uploadsDir, backupDir, UPLOADS_DIR: process.env.UPLOADS_DIR }, 'Creating backup')
   if (!fs.existsSync(uploadsDir)) {
     log.warn({ uploadsDir }, 'Uploads directory does not exist, uploads will be skipped')
   }
