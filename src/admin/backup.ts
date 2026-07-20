@@ -60,6 +60,11 @@ export async function createBackup(): Promise<{
   const dbPath = config.db.path
   const uploadsDir = getUploadsDir()
 
+  log.info({ dbPath, uploadsDir, backupDir }, 'Creating backup')
+  if (!fs.existsSync(uploadsDir)) {
+    log.warn({ uploadsDir }, 'Uploads directory does not exist, uploads will be skipped')
+  }
+
   // 确保备份目录存在
   fs.mkdirSync(backupDir, { recursive: true })
 

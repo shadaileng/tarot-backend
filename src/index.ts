@@ -3284,6 +3284,8 @@ async function start(): Promise<void> {
       puppeteerPath: config.puppeteer.executablePath || '(system default)',
       puppeteerArgs: config.puppeteer.args,
       logRetentionDays: config.db.retentionDays,
+      uploadsDir: getUploadsDir(),
+      backupDir: config.backup.dir,
     }, 'Service started')
 
     // 周期状态日志 — 每 60s 输出一条 metrics snapshot（健康自检）
