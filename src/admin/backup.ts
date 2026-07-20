@@ -7,7 +7,7 @@ import { getLogger } from '../logger.js'
 
 const log = getLogger('Admin:Backup')
 
-const BACKUP_FILENAME_RE = /^tarot-backup-[\d-]+\.tar\.gz$/
+const BACKUP_FILENAME_RE = /^tarot-backup-[\dT-]+\.tar\.gz$/
 const RETENTION_DAYS = 30
 
 // ==================== 备份核心逻辑 ====================
