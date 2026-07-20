@@ -2631,7 +2631,7 @@ app.get('/api/admin/backup/download/:filename', adminAuthMiddleware, async (req,
     }
     res.setHeader('Content-Type', 'application/gzip')
     res.setHeader('Content-Disposition', `attachment; filename="${req.params.filename}"`)
-    res.sendFile(filePath)
+    res.sendFile(path.resolve(filePath))
   } catch (err) {
     log.error({ err }, 'Failed to download backup')
     res.status(500).json({ error: 'INTERNAL_ERROR', message: '下载备份失败' })
