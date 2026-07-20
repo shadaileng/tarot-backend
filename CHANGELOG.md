@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.32.0] - 2026-07-20
+
+### Added
+
+- 备份恢复 API（Admin）：`POST /api/admin/backup`（触发备份）、`GET /api/admin/backup/list`（列出备份）、`GET /api/admin/backup/download/:filename`（下载备份）、`DELETE /api/admin/backup/:filename`（删除备份）、`POST /api/admin/restore`（上传备份包恢复）
+- 备份核心逻辑模块（`src/admin/backup.ts`）：支持 WAL checkpoint、数据库+上传文件备份、tar.gz 压缩打包、热替换恢复
+
 ## [2.31.0] - 2026-07-18
 
 ### Added

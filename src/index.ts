@@ -61,6 +61,13 @@ import {
   handleAdminReply,
   handleAdminUpdateStatus,
 } from './feedback/handler.js'
+import {
+  createBackup,
+  listBackups,
+  getBackupFilePath,
+  deleteBackup,
+  restoreFromBackup,
+} from './admin/backup.js'
 
 const log = getLogger('API')
 
@@ -2542,6 +2549,198 @@ app.get('/api/admin/feedback', adminAuthMiddleware, handleAdminListFeedback)
 app.get('/api/admin/feedback/:id', adminAuthMiddleware, handleAdminGetDetail)
 app.post('/api/admin/feedback/:id/reply', adminAuthMiddleware, handleAdminReply)
 app.put('/api/admin/feedback/:id/status', adminAuthMiddleware, handleAdminUpdateStatus)
+
+// ========== 备份恢复 API（Admin JWT）==========
+
+const backupUpload = multer({
+  dest: path.resolve(process.cwd(), 'data', 'backups', '_uploads'),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
+  fileFilter: (_req: any, file: any, cb: any) => {
+    if (file.originalname.endsWith('.tar.gz')) cb(null, true)
+    else cb(new Error('只支持 .tar.gz 格式的备份文件'))
+  },
+})
+
+// POST /api/admin/backup — 触发备份
+app.post('/api/admin/backup', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'backup',
+      targetId: null,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能执行此操作' })
+    return
+  }
+  try {
+    const result = await createBackup()
+    if (!result.success) {
+      res.status(500).json({ error: 'BACKUP_FAILED', message: result.error })
+      return
+    }
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_backup_create',
+      targetType: 'backup',
+      targetId: result.backup!.name,
+      newValue: { filename: result.backup!.filename, size: result.backup!.size },
+      ipAddress: req.ip,
+    })
+    res.json({
+      success: true,
+      backup: {
+        name: result.backup!.name,
+        filename: result.backup!.filename,
+        size: result.backup!.size,
+        createdAt: result.backup!.createdAt,
+        includes: { database: true, uploads: true },
+      },
+    })
+  } catch (err) {
+    log.error({ err }, 'Backup creation failed')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '备份失败' })
+  }
+})
+
+// GET /api/admin/backup/list — 列出备份
+app.get('/api/admin/backup/list', adminAuthMiddleware, async (_req, res) => {
+  try {
+    const result = await listBackups()
+    res.json(result)
+  } catch (err) {
+    log.error({ err }, 'Failed to list backups')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '获取备份列表失败' })
+  }
+})
+
+// GET /api/admin/backup/download/:filename — 下载备份
+app.get('/api/admin/backup/download/:filename', adminAuthMiddleware, async (req, res) => {
+  try {
+    const filePath = getBackupFilePath(req.params.filename)
+    if (!filePath) {
+      res.status(404).json({ error: 'NOT_FOUND', message: '备份文件不存在' })
+      return
+    }
+    res.setHeader('Content-Type', 'application/gzip')
+    res.setHeader('Content-Disposition', `attachment; filename="${req.params.filename}"`)
+    res.sendFile(filePath)
+  } catch (err) {
+    log.error({ err }, 'Failed to download backup')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '下载备份失败' })
+  }
+})
+
+// DELETE /api/admin/backup/:filename — 删除备份
+app.delete('/api/admin/backup/:filename', adminAuthMiddleware, async (req, res) => {
+  if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'backup',
+      targetId: req.params.filename,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能执行此操作' })
+    return
+  }
+  try {
+    const result = deleteBackup(req.params.filename)
+    if (!result.success) {
+      res.status(400).json({ error: 'DELETE_FAILED', message: result.error })
+      return
+    }
+    // 记录审计日志
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'admin_backup_delete',
+      targetType: 'backup',
+      targetId: req.params.filename,
+      ipAddress: req.ip,
+    })
+    res.json({ success: true, message: '备份已删除' })
+  } catch (err) {
+    log.error({ err }, 'Failed to delete backup')
+    res.status(500).json({ error: 'INTERNAL_ERROR', message: '删除备份失败' })
+  }
+})
+
+// POST /api/admin/restore — 上传备份包并恢复
+app.post('/api/admin/restore', adminAuthMiddleware, (req: Request, res: Response) => {
+  if ((req as any).adminRole === 'readonly') {
+    insertAuditLog({
+      actorType: 'admin',
+      actorId: (req as any).adminId,
+      actorName: (req as any).adminUsername,
+      action: 'access_denied',
+      targetType: 'backup',
+      targetId: null,
+      newValue: { reason: 'readonly_admin_cannot_modify', endpoint: req.path },
+      ipAddress: (req as any).ip || req.ip,
+    })
+    res.status(403).json({ error: 'FORBIDDEN', message: '只读管理员不能执行此操作' })
+    return
+  }
+  backupUpload.single('file')(req, res, async (err: any) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          res.status(400).json({ error: 'FILE_TOO_LARGE', message: '备份文件不能超过 100MB' })
+          return
+        }
+      }
+      res.status(400).json({ error: 'UPLOAD_ERROR', message: err.message || '上传失败' })
+      return
+    }
+    const file = (req as any).file
+    if (!file) {
+      res.status(400).json({ error: 'NO_FILE', message: '请选择备份文件' })
+      return
+    }
+    try {
+      const result = await restoreFromBackup(file.path)
+      // 清理上传的临时文件
+      try { fs.unlinkSync(file.path) } catch {}
+
+      if (!result.success) {
+        res.status(400).json({ error: 'RESTORE_FAILED', message: result.message })
+        return
+      }
+      // 记录审计日志
+      insertAuditLog({
+        actorType: 'admin',
+        actorId: (req as any).adminId,
+        actorName: (req as any).adminUsername,
+        action: 'admin_restore',
+        targetType: 'backup',
+        targetId: file.originalname,
+        newValue: result.restored,
+        ipAddress: req.ip,
+      })
+      res.json({
+        success: true,
+        message: result.message,
+        restored: result.restored,
+        requireRestart: result.requireRestart,
+      })
+    } catch (e) {
+      log.error({ err: e }, 'Restore failed')
+      res.status(500).json({ error: 'INTERNAL_ERROR', message: '恢复失败' })
+    }
+  })
+})
 
 // ========== 审计日志 API（Admin JWT）==========
 

@@ -191,6 +191,11 @@ POST /poster  { cards[], question, spreadName, ... }
 | POST | `/api/admin/audit-logs/clean` | 手动清理过期审计日志 | Admin JWT | ❌ |
 | GET | `/api/admin/audit-logs/export` | 导出审计日志CSV | Admin JWT | ❌ |
 | GET | `/api/admin/audit-logs/anomalies` | 异常行为检测 | Admin JWT | ❌ |
+| POST | `/api/admin/backup` | 触发备份 | Admin JWT | ❌ |
+| GET | `/api/admin/backup/list` | 列出所有备份 | Admin JWT | ❌ |
+| GET | `/api/admin/backup/download/:filename` | 下载备份包 | Admin JWT | ❌ |
+| DELETE | `/api/admin/backup/:filename` | 删除备份 | Admin JWT | ❌ |
+| POST | `/api/admin/restore` | 上传备份包恢复数据 | Admin JWT | ❌ |
 
 ### POST /reading
 
