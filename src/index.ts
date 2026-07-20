@@ -3213,7 +3213,6 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 })
 
 async function start(): Promise<void> {
-  log.info({ UPLOADS_DIR: process.env.UPLOADS_DIR }, 'ENV UPLOADS_DIR check at startup')
   await getDb()
   // DB 初始化日志由 src/db/index.ts 的 getDb() 内部输出（含 path + new 标记）
 
@@ -3285,8 +3284,6 @@ async function start(): Promise<void> {
       puppeteerPath: config.puppeteer.executablePath || '(system default)',
       puppeteerArgs: config.puppeteer.args,
       logRetentionDays: config.db.retentionDays,
-      uploadsDir: getUploadsDir(),
-      backupDir: config.backup.dir,
     }, 'Service started')
 
     // 周期状态日志 — 每 60s 输出一条 metrics snapshot（健康自检）
