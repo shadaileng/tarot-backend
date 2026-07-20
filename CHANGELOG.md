@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.32.1] - 2026-07-20
+
+### Fixed
+
+- 修复恢复后 sql.js 内存数据库未重置的 Bug：恢复流程只替换了磁盘文件但未重置内存连接，后续 `saveDb()` 将旧内存状态写回磁盘覆盖已恢复的文件。新增 `resetDb()`（`src/db/index.ts`）关闭连接不保存，在 `restoreFromBackup()`（`src/admin/backup.ts`）复制完数据库后调用，确保下次 `getDb()` 从新文件重新加载
+
 ## [2.32.0] - 2026-07-20
 
 ### Added

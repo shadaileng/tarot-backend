@@ -708,6 +708,23 @@ export function closeDb(): void {
   }
 }
 
+/**
+ * 关闭数据库连接但不保存（用于恢复场景）
+ * sql.js 是 WASM 内存数据库，恢复时替换磁盘文件后必须调用此函数，
+ * 否则后续 saveDb() 会将旧内存状态写回磁盘覆盖已恢复的文件。
+ */
+export function resetDb(): void {
+  if (saveDbTimeout) {
+    clearTimeout(saveDbTimeout)
+    saveDbTimeout = null
+  }
+  pendingSave = false
+  if (db) {
+    db.close()
+    db = null
+  }
+}
+
 // ========== 快照相关 ==========
 
 const LOG_TABLES = [

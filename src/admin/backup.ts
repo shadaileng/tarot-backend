@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
 import { config, getUploadsDir, getBackupDir } from '../config.js'
-import { getDb, saveDb } from '../db/index.js'
+import { getDb, saveDb, resetDb } from '../db/index.js'
 import { getLogger } from '../logger.js'
 
 const log = getLogger('Admin:Backup')
@@ -283,6 +283,8 @@ export async function restoreFromBackup(
       if (fs.existsSync(shmFile)) {
         fs.copyFileSync(shmFile, `${dbPath}-shm`)
       }
+      // 重置内存数据库实例（不保存当前状态），下次 getDb() 从新文件重新加载
+      resetDb()
       dbRestored = true
       log.info('Database restored')
     }
