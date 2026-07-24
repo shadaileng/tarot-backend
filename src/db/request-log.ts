@@ -93,17 +93,19 @@ export async function queryRequestLogs(page: number = 1, limit: number = 50, tar
 
   let countSql = 'SELECT COUNT(*) as cnt FROM request_logs l'
   let querySql = `SELECT l.*,
-    u.nickname   AS user_nickname,
-    u.email      AS user_email,
+    COALESCE(u.nickname, a.display_name, a.username) AS user_nickname,
+    COALESCE(u.email, a.username) AS user_email,
     u.avatar_url AS user_avatar,
     CASE
+      WHEN a.id IS NOT NULL THEN 'admin'
       WHEN u.openid != '' AND u.email IS NOT NULL THEN 'wechat+email'
       WHEN u.openid != '' THEN 'wechat'
       WHEN u.email IS NOT NULL THEN 'email'
       ELSE 'anonymous'
     END AS login_type
   FROM request_logs l
-  LEFT JOIN users u ON l.user_id = u.id`
+  LEFT JOIN users u ON l.user_id = u.id
+  LEFT JOIN admins a ON l.user_id = a.id`
   const where: string[] = []
   const params: any[] = []
 
@@ -151,10 +153,11 @@ export async function queryRequestLogs(page: number = 1, limit: number = 50, tar
 export async function getRequestLogById(id: string): Promise<RequestLogEntry | undefined> {
   const db = await getDb()
   const stmt = db.prepare(`SELECT l.*,
-    u.nickname   AS user_nickname,
-    u.email      AS user_email,
+    COALESCE(u.nickname, a.display_name, a.username) AS user_nickname,
+    COALESCE(u.email, a.username) AS user_email,
     u.avatar_url AS user_avatar,
     CASE
+      WHEN a.id IS NOT NULL THEN 'admin'
       WHEN u.openid != '' AND u.email IS NOT NULL THEN 'wechat+email'
       WHEN u.openid != '' THEN 'wechat'
       WHEN u.email IS NOT NULL THEN 'email'
@@ -162,6 +165,7 @@ export async function getRequestLogById(id: string): Promise<RequestLogEntry | u
     END AS login_type
   FROM request_logs l
   LEFT JOIN users u ON l.user_id = u.id
+  LEFT JOIN admins a ON l.user_id = a.id
   WHERE l.id = ?`)
   stmt.bind([id])
   let row: RequestLogEntry | undefined
