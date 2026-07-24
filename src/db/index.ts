@@ -105,21 +105,23 @@ function initSchema(database: Database): void {
 
   database.run(`
     CREATE TABLE IF NOT EXISTS request_logs (
-      id             TEXT PRIMARY KEY,
-      created_at     TEXT NOT NULL,
-      method         TEXT NOT NULL,
-      path           TEXT NOT NULL,
-      target         TEXT NOT NULL,
-      status_code    INTEGER,
-      duration_ms    INTEGER,
-      template_ms    INTEGER,
-      resource_ms    INTEGER,
-      screenshot_ms  INTEGER,
-      cache_hit      INTEGER DEFAULT 0,
-      ip_address     TEXT,
-      is_error       INTEGER DEFAULT 0,
-      error_msg      TEXT,
-      user_id        TEXT
+      id                TEXT PRIMARY KEY,
+      created_at        TEXT NOT NULL,
+      method            TEXT NOT NULL,
+      path              TEXT NOT NULL,
+      query_string      TEXT,
+      target            TEXT NOT NULL DEFAULT 'other',
+      status_code       INTEGER,
+      duration_ms       INTEGER,
+      ip_address        TEXT,
+      user_agent        TEXT,
+      request_body      TEXT,
+      response_body     TEXT,
+      request_body_size  INTEGER,
+      response_body_size INTEGER,
+      is_error          INTEGER DEFAULT 0,
+      error_msg         TEXT,
+      user_id           TEXT
     )
   `)
   database.run('CREATE INDEX IF NOT EXISTS idx_request_logs_created_at ON request_logs(created_at DESC)')
@@ -286,6 +288,19 @@ function initSchema(database: Database): void {
   try {
     database.run('ALTER TABLE audit_logs ADD COLUMN hash TEXT')
   } catch {}
+
+  // 兼容已有数据库：为 audit_logs 新增 hash 列（完整性链）
+  try {
+    database.run('ALTER TABLE audit_logs ADD COLUMN hash TEXT')
+  } catch {}
+
+  // 兼容已有数据库：为 request_logs 新增通用字段
+  try { database.run('ALTER TABLE request_logs ADD COLUMN query_string TEXT') } catch {}
+  try { database.run('ALTER TABLE request_logs ADD COLUMN user_agent TEXT') } catch {}
+  try { database.run('ALTER TABLE request_logs ADD COLUMN request_body TEXT') } catch {}
+  try { database.run('ALTER TABLE request_logs ADD COLUMN response_body TEXT') } catch {}
+  try { database.run('ALTER TABLE request_logs ADD COLUMN request_body_size INTEGER') } catch {}
+  try { database.run('ALTER TABLE request_logs ADD COLUMN response_body_size INTEGER') } catch {}
 
   // 更新邮箱唯一索引以支持软删除（排除已删除用户）
   try {

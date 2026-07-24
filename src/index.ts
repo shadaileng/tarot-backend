@@ -175,7 +175,7 @@ app.get('/api/health', async (req, res) => {
     cache: {
       size: posterCache.size,
       maxSize: posterCache.maxSize,
-      hitRate: stats.cacheHitRate,
+      hitRate: 0,
     },
     pool: poolStats ?? { available: 0, active: 0, waiting: 0, maxPages: config.pool.maxPages },
     metrics: {
@@ -206,18 +206,6 @@ app.get('/api/metrics', async (_req, res) => {
     '# TYPE request_errors_total counter',
     `request_errors_total ${stats.errors}`,
     '',
-    '# HELP request_cache_hits_total Total number of cache hits',
-    '# TYPE request_cache_hits_total counter',
-    `request_cache_hits_total ${stats.cacheHits}`,
-    '',
-    '# HELP request_cache_misses_total Total number of cache misses',
-    '# TYPE request_cache_misses_total counter',
-    `request_cache_misses_total ${stats.cacheMisses}`,
-    '',
-    '# HELP request_cache_hit_rate Cache hit rate (0-1)',
-    '# TYPE request_cache_hit_rate gauge',
-    `request_cache_hit_rate ${stats.cacheHitRate.toFixed(4)}`,
-    '',
     '# HELP request_duration_ms Request duration in milliseconds',
     '# TYPE request_duration_ms summary',
     `request_duration_ms{quantile="0.5"} ${stats.p50Ms}`,
@@ -225,18 +213,6 @@ app.get('/api/metrics', async (_req, res) => {
     `request_duration_ms{quantile="0.99"} ${stats.p99Ms}`,
     `request_duration_ms_sum ${(stats.avgTotalMs * stats.totalRequests).toFixed(0)}`,
     `request_duration_ms_count ${stats.totalRequests}`,
-    '',
-    '# HELP request_template_duration_ms Template generation duration (poster only)',
-    '# TYPE request_template_duration_ms gauge',
-    `request_template_duration_ms ${stats.avgTemplateMs.toFixed(2)}`,
-    '',
-    '# HELP request_resource_duration_ms Resource loading duration (poster only)',
-    '# TYPE request_resource_duration_ms gauge',
-    `request_resource_duration_ms ${stats.avgResourceMs.toFixed(2)}`,
-    '',
-    '# HELP request_screenshot_duration_ms Screenshot duration (poster only)',
-    '# TYPE request_screenshot_duration_ms gauge',
-    `request_screenshot_duration_ms ${stats.avgScreenshotMs.toFixed(2)}`,
     '',
   ]
 
@@ -3297,7 +3273,6 @@ async function start(): Promise<void> {
             ? (stats.errors / stats.totalRequests * 100).toFixed(2) + '%'
             : '0%',
           avgTotalMs: Math.round(stats.avgTotalMs),
-          cacheHitRate: (stats.cacheHitRate * 100).toFixed(1) + '%',
         }, 'Periodic status report')
       } catch (err) {
         log.error({ err }, 'Periodic status report failed')

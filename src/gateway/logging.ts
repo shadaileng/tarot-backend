@@ -21,6 +21,9 @@ const PREFIX_TARGETS: [string, string][] = [
   ['/api/admin/users', 'admin:user'],
   ['/api/admin/audit-logs', 'admin:audit'],
   ['/api/admin/client-events', 'admin:events'],
+  ['/api/reading/start', 'reading'],
+  ['/api/reading/result', 'reading'],
+  ['/api/reading/cancel', 'reading'],
   ['/api/admin', 'admin'],
   ['/api/auth', 'auth'],
   ['/admin/auth', 'auth'],
@@ -49,7 +52,6 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
 
   const start = Date.now()
   const logId = crypto.randomUUID()
-  const requestBody = req.body || {}
   const target = resolveTarget(req.path)
   const ip = req.ip || req.socket.remoteAddress || ''
 
@@ -96,25 +98,47 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
       }, `${req.method} ${req.path} ${res.statusCode} ${duration}ms`)
     }
 
-    // 从响应头提取分阶段耗时（poster 请求）
-    const templateMs = parseInt(res.getHeader('X-Render-Template-Ms') as string) || null
-    const resourceMs = parseInt(res.getHeader('X-Render-Resource-Ms') as string) || null
-    const screenshotMs = parseInt(res.getHeader('X-Render-Screenshot-Ms') as string) || null
-    const cacheHit = res.getHeader('X-Cache') === 'HIT'
+    // 请求/响应体处理
+    const userAgent = (req.headers['user-agent'] || null) as string | null
+    const queryString = req.url.includes('?') ? req.url.split('?')[1] || null : null
+
+    let requestBody: string | null = null
+    let requestBodySize: number | null = null
+    if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+      const str = JSON.stringify(req.body)
+      requestBodySize = str.length
+      requestBody = str.length > 2000 ? str.slice(0, 2000) + '...(truncated)' : str
+    }
+
+    let responseBody: string | null = null
+    let responseBodySize: number | null = null
+    if (body && typeof body === 'object' && !Buffer.isBuffer(body)) {
+      const str = JSON.stringify(body)
+      responseBodySize = str.length
+      responseBody = str.length > 2000 ? str.slice(0, 2000) + '...(truncated)' : str
+    } else if (body && Buffer.isBuffer(body)) {
+      responseBodySize = body.length
+      responseBody = `[binary: ${body.length} bytes]`
+    } else if (typeof body === 'string') {
+      responseBodySize = Buffer.byteLength(body)
+      responseBody = body.length > 2000 ? body.slice(0, 2000) + '...(truncated)' : body
+    }
 
     // 写入 request_logs（所有请求）
     insertRequestLog({
       id: logId,
       method: req.method,
       path: req.path,
+      query_string: queryString,
       target,
       status_code: res.statusCode,
       duration_ms: duration,
-      template_ms: templateMs,
-      resource_ms: resourceMs,
-      screenshot_ms: screenshotMs,
-      cache_hit: cacheHit,
       ip_address: ip,
+      user_agent: userAgent,
+      request_body: requestBody,
+      response_body: responseBody,
+      request_body_size: requestBodySize,
+      response_body_size: responseBodySize,
       is_error: isError,
       error_msg: errorMsg,
       user_id: userId,
@@ -123,7 +147,6 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
     }).catch((err) => {
       log.error({ err, logId, target, userId, statusCode: res.statusCode }, 'insertRequestLog FAILED')
     })
-
   }
 
   const originalJson = res.json.bind(res)
