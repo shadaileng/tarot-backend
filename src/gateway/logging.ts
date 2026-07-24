@@ -1,5 +1,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import crypto from 'crypto'
+import jwt from 'jsonwebtoken'
+import { config } from '../config.js'
 import { insertRequestLog } from '../db/request-log.js'
 import { getLogger } from '../logger.js'
 
@@ -44,6 +46,17 @@ function resolveTarget(path: string): string {
   return 'other'
 }
 
+function tryParseUserIdFromHeader(req: Request): string | null {
+  const auth = req.headers.authorization
+  if (!auth?.startsWith('Bearer ')) return null
+  try {
+    const decoded = jwt.verify(auth.slice(7), config.jwtSecret || 'dev-secret-do-not-use-in-production') as any
+    return typeof decoded.sub === 'string' ? decoded.sub : null
+  } catch {
+    return null
+  }
+}
+
 export function loggingMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (SKIP_PATHS.includes(req.path) || req.path.startsWith('/api/logs/')) {
     next()
@@ -64,7 +77,7 @@ export function loggingMiddleware(req: Request, res: Response, next: NextFunctio
     if (logWritten) return
     logWritten = true
     const duration = Date.now() - start
-    const userId = (req as any).userId || null
+    const userId = (req as any).userId || (req as any).adminId || tryParseUserIdFromHeader(req) || null
     const isError = res.statusCode >= 400
     const respObj = body && typeof body === 'object' && !Buffer.isBuffer(body)
       ? body as Record<string, any>

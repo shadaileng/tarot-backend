@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 请求日志通用化改造：新增请求/响应体捕获（JSON 截断至 2000 chars，二进制占位）、User-Agent、查询参数字段
 - `request_logs` 表新增字段：`query_string`, `user_agent`, `request_body`, `response_body`, `request_body_size`, `response_body_size`
 - 异步占卜路径（`/api/reading/start`, `/api/reading/result`, `/api/reading/cancel`）加入 target 映射，归入 `reading` 分类
+- `request_logs.user_id` 全覆盖捕获：按优先级 `req.userId` → `req.adminId` → `Authorization` header 可选解析 JWT
 
 ### Changed
 
